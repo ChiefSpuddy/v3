@@ -36,8 +36,9 @@ function App() {
   };
 
   const extractCardNameFromOCR = (ocrText) => {
-    const words = ocrText.split(/[ ,\n]+/); // Split by spaces, commas, or newlines
-
+    const segments = ocrText.split(","); // Split the OCR text by commas
+  
+    // Stopwords and exclusions to prevent invalid names
     const stopwords = [
       "TRAINER",
       "ITEM",
@@ -47,46 +48,45 @@ function App() {
       "DAMAGE",
       "WEAKNESS",
       "RESISTANCE",
-      "CD", // Exclude "CD"
+      "CD",
+      "HP",
+      "BASIC",
     ];
-
-    const cleanedWords = words
-      .filter((word) => {
-        const lowerWord = word.toLowerCase();
-        return (
-          word.length > 1 &&
-          !exclusions.includes(lowerWord) &&
-          !stopwords.includes(word.toUpperCase()) &&
-          /^[A-Za-z]+$/.test(word) // Exclude garbled words
-        );
-      })
-      .map((word) => correctMisreads(word)); // Apply corrections
-
-    let name = "";
-
-    for (let i = 0; i < cleanedWords.length; i++) {
-      const currentWord = cleanedWords[i];
-      const nextWord = cleanedWords[i + 1] || "";
-
-      // Two-word names (e.g., "Precious Trolley")
-      if (/^[A-Z]/.test(currentWord) && /^[A-Z]/.test(nextWord)) {
-        if (!stopwords.includes(nextWord.toUpperCase())) {
-          name = `${currentWord} ${nextWord}`;
-        } else {
-          name = currentWord; // Ignore the second word if it's a stopword
-        }
-        break;
-      }
-
-      // Single-word names
-      if (/^[A-Z]/.test(currentWord)) {
-        name = currentWord;
-        break;
+  
+    const exclusions = [
+      "hp",
+      "trainer",
+      "basic",
+      "item",
+      "stage",
+      "basc",
+      "utem",
+      "iten",
+      "splash",
+      "typhoon",
+      "basis",
+      "basig",
+    ];
+  
+    for (const segment of segments) {
+      const trimmedSegment = segment.trim(); // Remove leading and trailing whitespace
+      const lowerSegment = trimmedSegment.toLowerCase();
+  
+      // Check if the segment is valid: not in exclusions/stopwords and contains only alphabetic characters
+      if (
+        trimmedSegment.length > 1 &&
+        /^[A-Za-z\s]+$/.test(trimmedSegment) && // Alphabetic words or names
+        !exclusions.includes(lowerSegment) &&
+        !stopwords.includes(trimmedSegment.toUpperCase())
+      ) {
+        return correctMisreads(trimmedSegment); // Apply corrections and return the first valid name
       }
     }
-
-    return name || "Not Detected";
+  
+    return "Not Detected"; // Fallback if no valid name is found
   };
+  
+  
 
   const extractSetNumberFromOCR = (ocrText) => {
     const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g); // Match "163/182" or "036 /419"
