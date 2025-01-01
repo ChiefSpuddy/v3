@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import axios from "axios";
+import "./App.css"; // Make sure to include the CSS file for the spinner
 
 function App() {
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
   const [query, setQuery] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
+  const [loading, setLoading] = useState(false); // Add loading state
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -21,6 +23,7 @@ function App() {
     const formData = new FormData();
     formData.append("file", file);
 
+    setLoading(true); // Show spinner
     try {
       const response = await axios.post("http://127.0.0.1:5000/ocr", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -29,6 +32,8 @@ function App() {
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
+    } finally {
+      setLoading(false); // Hide spinner
     }
   };
 
@@ -55,7 +60,13 @@ function App() {
       <section>
         <h2>OCR Scanner</h2>
         <input type="file" onChange={handleFileChange} />
-        <button onClick={handleScan}>Upload & Scan</button>
+        <button
+          onClick={handleScan}
+          className={`button ${loading ? "loading" : ""}`} // Add spinner class when loading
+          disabled={loading} // Disable button while loading
+        >
+          {loading ? "Scanning..." : "Upload & Scan"}
+        </button>
         <p>
           <strong>OCR Result:</strong> {ocrResult}
         </p>
