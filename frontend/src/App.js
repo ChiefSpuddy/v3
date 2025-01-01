@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import "./App.css"; // Ensure this file includes the new styles
+import "./App.css";
 
 function App() {
   const [file, setFile] = useState(null);
@@ -14,17 +14,16 @@ function App() {
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
-    setFileUploaded(true); // Update file uploaded state
-    setScanCompleted(false); // Reset scan completed state
+    setFileUploaded(true);
+    setScanCompleted(false);
     setOcrResult("");
     setCardName("");
     setCardSetNumber("");
-    setEbayResults([]); // Reset eBay results
+    setEbayResults([]);
   };
 
   const handleScan = async () => {
     if (!file) {
-      console.error("No file selected!");
       alert("Please select a file first.");
       return;
     }
@@ -42,11 +41,12 @@ function App() {
       setOcrResult(resultText);
 
       const name = response.data.cardName;
-      setCardName(name);
-
       const setNumber = response.data.cardSetNumber;
-      setCardSetNumber(setNumber);
+      console.log("Extracted Card Name:", name); // Debugging log
+      console.log("Extracted Card Set Number:", setNumber); // Debugging log
 
+      setCardName(name);
+      setCardSetNumber(setNumber);
       setScanCompleted(true);
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
@@ -63,16 +63,17 @@ function App() {
     }
 
     const query = `${cardName} ${cardSetNumber}`;
+    console.log("Search Query:", query); // Debugging log
+
     setLoading(true);
     try {
       const response = await axios.get(
-        `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`
+        `http://127.0.0.1:5000/ebay`, // Update this to your backend endpoint
+        { params: { query } }
       );
 
-      // Here you can process the eBay results using a web scraping or parsing service,
-      // or integrate with the eBay API for structured results.
-      // Assuming your backend already provides parsed results:
       const ebayData = response.data.items || [];
+      console.log("eBay Results:", ebayData); // Debugging log
       setEbayResults(ebayData);
     } catch (error) {
       console.error("Error fetching eBay results:", error);
@@ -131,7 +132,6 @@ function App() {
 
       <hr />
 
-      {/* eBay Results Section */}
       <section>
         <h2>eBay Results</h2>
         <button
