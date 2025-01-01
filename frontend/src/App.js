@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import axios from "axios";
-import extractCardSetNumber from "./utils/extractCardSetNumber"; // Import the new function
 import "./App.css"; // Ensure this file includes the new styles
 
 function App() {
@@ -21,6 +20,7 @@ function App() {
     setOcrResult("");
     setCardName("");
     setCardSetNumber("");
+
   };
 
   const handleScan = async () => {
@@ -91,6 +91,17 @@ function App() {
 
     return "Not detected"; // Fallback if no name is found
   };
+
+  const extractCardSetNumber = (text) => {
+    // Enhanced regex to match formats like 123/123, 01/123, 123/SVP, 181/162, etc.
+    const regex = /\b\d{1,3}[\/|\\]\d{1,5}\b/gi; // Includes \ and accounts for varying formats
+
+    const matches = text.match(regex);
+  
+    // Return the first valid match or a fallback message
+    return matches && matches.length > 0 ? matches[0] : "Not detected";
+  };
+  
 
   const handleSearch = async () => {
     if (!query) {
