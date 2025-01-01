@@ -4,6 +4,7 @@ import "./App.css"; // Ensure this file includes the new styles
 
 function App() {
   const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(""); // Store the file preview URL
   const [ocrResult, setOcrResult] = useState("");
   const [query, setQuery] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
@@ -11,7 +12,9 @@ function App() {
   const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    const uploadedFile = e.target.files[0];
+    setFile(uploadedFile);
+    setFilePreview(URL.createObjectURL(uploadedFile)); // Create a preview URL
     setFileUploaded(true); // Update file uploaded state
   };
 
@@ -71,6 +74,15 @@ function App() {
             />
           </label>
         </div>
+        {filePreview && (
+          <div style={{ marginTop: "10px" }}>
+            <img
+              src={filePreview}
+              alt="Uploaded File Preview"
+              style={{ width: "200px", border: "1px solid #ccc" }}
+            />
+          </div>
+        )}
         <button
           onClick={handleScan}
           className={`button ${loading ? "loading" : ""}`}
