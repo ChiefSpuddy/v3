@@ -20,12 +20,13 @@ EBAY_ACCESS_TOKEN = None
 # Verification token for Marketplace Account Deletion Notifications
 EBAY_VERIFICATION_TOKEN = "a7b3f9d1-e0b5-43b7-bf3c-05d4b7fd2186"  # Your verification token, ensure it matches the one in eBay Developer Portal
 
+
 def get_ebay_oauth_token():
     """Fetch OAuth token from eBay API and store it globally."""
     global EBAY_ACCESS_TOKEN
     try:
         # Base64 encode the client credentials for HTTP Basic Auth
-        credentials = base64.b64encode(f"{EBAY_CLIENT_ID}:{EBAY_CLIENT_SECRET}".encode('utf-8')).decode('utf-8')
+        credentials = base64.b64encode(f"{EBAY_CLIENT_ID}:{EBAY_CLIENT_SECRET}".encode("utf-8")).decode("utf-8")
 
         # Prepare the data for the POST request to eBay OAuth endpoint
         data = {
@@ -58,8 +59,9 @@ def get_ebay_oauth_token():
         print(f"Error fetching eBay OAuth token: {e}")
         EBAY_ACCESS_TOKEN = None
 
-def search_ebay(card_name, card_set_number):
-    """Searches eBay UK using the card name and set number."""
+
+def search_ebay_uk(card_name, card_set_number):
+    """Searches eBay for items and logs unfiltered results."""
     global EBAY_ACCESS_TOKEN
     if not EBAY_ACCESS_TOKEN:
         get_ebay_oauth_token()
@@ -72,30 +74,34 @@ def search_ebay(card_name, card_set_number):
 
     params = {
         "q": query,
-        "limit": 5,
-        "siteId": 3  # Ensure we are searching the UK eBay marketplace
+        "limit": 50,  # Fetch more items
     }
     headers = {
         "Authorization": f"Bearer {EBAY_ACCESS_TOKEN}",
+        "Content-Language": "en-GB"
     }
 
     try:
         response = requests.get(EBAY_SEARCH_URL, headers=headers, params=params)
         response.raise_for_status()  # Raise an error for bad responses
         items = response.json().get("itemSummaries", [])
-        print("eBay search response:", response.json())  # Debug log
+        print("Unfiltered eBay items:", items)  # Log all items
 
+        # Return all items for manual inspection
         return [
             {
                 "title": item.get("title", "N/A"),
                 "viewItemURL": item.get("itemWebUrl", "N/A"),
-                "price": item.get("price", {}).get("value", "N/A"),
+                "price": f"£{item['price']['value']}" if item.get("price") else "N/A",
+                "location": item.get("itemLocation", {}).get("country", "N/A"),
             }
             for item in items
         ]
     except requests.exceptions.RequestException as e:
         print(f"Error with eBay API request: {e}")  # Log error
         return {"error": str(e)}
+
+
 
 
 @app.route("/ocr", methods=["POST"])
@@ -118,7 +124,7 @@ def ocr():
         card_set_number = extract_card_set_number(results)
 
         # Fetch eBay results using extracted details
-        ebay_results = search_ebay(card_name, card_set_number)
+        ebay_results = search_ebay_uk(card_name, card_set_number)
 
         return jsonify({
             "text": results,
@@ -128,6 +134,7 @@ def ocr():
         })
     except Exception as e:
         return jsonify({"error": f"Failed to process the file: {str(e)}"}), 500
+
 
 def extract_card_name(text):
     """Extracts the card name from OCR text."""
@@ -140,11 +147,13 @@ def extract_card_name(text):
     valid_entries = [entry.strip() for entry in entries if entry.lower() not in exclusions and len(entry) > 1]
     return valid_entries[0] if valid_entries else "Not Detected"
 
+
 def extract_card_set_number(text):
     """Extracts the card set number from OCR text."""
     result_str = " ".join(text)
     matches = re.findall(r'\b\d{1,3}[\/|\\]\d{1,5}\b', result_str)
     return matches[0] if matches else "Not Detected"
+
 
 @app.route("/api/ebay-search", methods=["POST"])
 def ebay_search():
@@ -156,38 +165,9 @@ def ebay_search():
     if not card_name or not card_set_number:
         return jsonify({"error": "Card name and set number are required."}), 400
 
-    ebay_results = search_ebay(card_name, card_set_number)
+    ebay_results = search_ebay_uk(card_name, card_set_number)
     return jsonify(ebay_results)
 
-@app.route("/api/get-ebay-token", methods=["POST"])
-def get_ebay_token():
-    """Fetches the OAuth token from eBay and returns it."""
-    global EBAY_ACCESS_TOKEN
-    if not EBAY_ACCESS_TOKEN:
-        get_ebay_oauth_token()
-
-    if EBAY_ACCESS_TOKEN:
-        return jsonify({"access_token": EBAY_ACCESS_TOKEN}), 200
-    else:
-        return jsonify({"error": "Failed to retrieve eBay OAuth token"}), 500
-
-@app.route("/ebay/notifications", methods=["POST"])
-def ebay_notifications():
-    """
-    Handle Marketplace Account Deletion Notifications.
-    """
-    data = request.json
-
-    # Verify the token
-    if data.get("verificationToken") != EBAY_VERIFICATION_TOKEN:
-        print("Invalid verification token received.")
-        return jsonify({"error": "Invalid token"}), 403
-
-    # Log the notification for debugging
-    print("Received Marketplace Account Deletion Notification:", data)
-
-    # Respond with success
-    return jsonify({"message": "Notification received"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
