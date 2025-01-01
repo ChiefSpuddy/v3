@@ -1,3 +1,5 @@
+// Full App.js
+
 import React, { useState } from "react";
 import axios from "axios";
 import "./App.css";
@@ -12,7 +14,20 @@ function App() {
   const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
   const [scanCompleted, setScanCompleted] = useState(false); // Track scan completion state
 
-  const exclusions = ["hp", "mp", "stagg]", "stage]", "cd", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig"];
+  const exclusions = [
+    "hp",
+    "trainer",
+    "basic",
+    "item",
+    "stage",
+    "basc",
+    "utem",
+    "iten",
+    "splash",
+    "typhoon",
+    "basis",
+    "basig",
+  ];
 
   const correctMisreads = (text) => {
     return text
@@ -23,10 +38,28 @@ function App() {
   const extractCardNameFromOCR = (ocrText) => {
     const words = ocrText.split(/[ ,\n]+/); // Split by spaces, commas, or newlines
 
-    const stopwords = ["TRAINER", "ITEM", "ABILITY", "STAGE", "ATTACK", "DAMAGE", "WEAKNESS", "RESISTANCE"];
+    const stopwords = [
+      "TRAINER",
+      "ITEM",
+      "STAGE",
+      "ABILITY",
+      "ATTACK",
+      "DAMAGE",
+      "WEAKNESS",
+      "RESISTANCE",
+      "CD", // Exclude "CD"
+    ];
 
     const cleanedWords = words
-      .filter((word) => word.length > 1 && !exclusions.includes(word.toLowerCase())) // Exclude unwanted words
+      .filter((word) => {
+        const lowerWord = word.toLowerCase();
+        return (
+          word.length > 1 &&
+          !exclusions.includes(lowerWord) &&
+          !stopwords.includes(word.toUpperCase()) &&
+          /^[A-Za-z]+$/.test(word) // Exclude garbled words
+        );
+      })
       .map((word) => correctMisreads(word)); // Apply corrections
 
     let name = "";
@@ -35,29 +68,28 @@ function App() {
       const currentWord = cleanedWords[i];
       const nextWord = cleanedWords[i + 1] || "";
 
-      // Skip stopwords but continue searching for valid names
-      if (stopwords.includes(currentWord.toUpperCase())) {
-        continue;
-      }
-
-      // Two-word names (e.g., "Night Stretcher")
+      // Two-word names (e.g., "Precious Trolley")
       if (/^[A-Z]/.test(currentWord) && /^[A-Z]/.test(nextWord)) {
-        name = `${currentWord} ${nextWord}`;
+        if (!stopwords.includes(nextWord.toUpperCase())) {
+          name = `${currentWord} ${nextWord}`;
+        } else {
+          name = currentWord; // Ignore the second word if it's a stopword
+        }
         break;
       }
 
-      // Single-word names (fallback if no two-word name is found)
+      // Single-word names
       if (/^[A-Z]/.test(currentWord)) {
         name = currentWord;
         break;
       }
     }
 
-    return name || "Not Detected"; // Fallback
+    return name || "Not Detected";
   };
 
   const extractSetNumberFromOCR = (ocrText) => {
-    const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g); // Match "163/182" or "061 /064"
+    const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g); // Match "163/182" or "036 /419"
 
     if (!matches) return "Not Detected";
 
