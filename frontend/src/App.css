@@ -37,9 +37,12 @@
   }
 }
 
-.button {
+/* Unified Button Styles */
+.button,
+.file-label {
+  display: inline-block;
   position: relative;
-  padding: 10px 20px;
+  padding: 15px 30px;
   font-size: 16px;
   border: none;
   background-color: #3498db;
@@ -47,12 +50,30 @@
   cursor: pointer;
   outline: none;
   border-radius: 5px;
+  text-align: center;
   transition: background-color 0.3s;
+  margin-right: 10px; /* Add spacing between buttons */
 }
 
-.button:disabled {
+.button:last-of-type {
+  margin-right: 0; /* Remove margin from the last button if necessary */
+}
+
+
+.button:disabled,
+.file-label:disabled {
   background-color: #95a5a6;
   cursor: not-allowed;
+}
+
+.button:hover,
+.file-label:hover {
+  background-color: #2980b9;
+}
+
+.button:active,
+.file-label:active {
+  background-color: #1c6ea4;
 }
 
 .button.loading {
@@ -82,3 +103,18 @@
   }
 }
 
+/* File Input Specific Styles */
+.file-input-container {
+  position: relative;
+  display: inline-block;
+}
+
+.file-input {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
