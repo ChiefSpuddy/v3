@@ -52,7 +52,6 @@ function App() {
       "HP",
       "BASIC",
     ];
-  
     const exclusions = [
       "hp",
       "trainer",
@@ -66,27 +65,38 @@ function App() {
       "typhoon",
       "basis",
       "basig",
+      "stagg"
     ];
   
     for (const segment of segments) {
-      const trimmedSegment = segment.trim(); // Remove leading and trailing whitespace
-      const lowerSegment = trimmedSegment.toLowerCase();
+      let trimmedSegment = segment.trim(); // Remove leading and trailing whitespace
   
-      // Check if the segment is valid: not in exclusions/stopwords and contains only alphabetic characters
+      // Clean special characters from segment (e.g., `'Ceruledge@` becomes `Ceruledge`)
+      trimmedSegment = trimmedSegment.replace(/[^A-Za-z\s]/g, "");
+  
+      // Check if the segment is valid: not in exclusions/stopwords and contains valid text
       if (
         trimmedSegment.length > 1 &&
-        /^[A-Za-z\s]+$/.test(trimmedSegment) && // Alphabetic words or names
-        !exclusions.includes(lowerSegment) &&
+        /^[A-Za-z\s]+$/.test(trimmedSegment) && // Include only alphabetic characters
+        !exclusions.includes(trimmedSegment.toLowerCase()) &&
         !stopwords.includes(trimmedSegment.toUpperCase())
       ) {
-        return correctMisreads(trimmedSegment); // Apply corrections and return the first valid name
+        const words = trimmedSegment.split(" ");
+  
+        // Handle two-word names (e.g., "Ceruledge EX")
+        if (words.length > 1 && /^[A-Z]/.test(words[0]) && /^[A-Z]/.test(words[1])) {
+          return `${words[0]} ${words[1]}`;
+        }
+  
+        // Return single-word name
+        if (/^[A-Z]/.test(trimmedSegment)) {
+          return trimmedSegment;
+        }
       }
     }
   
     return "Not Detected"; // Fallback if no valid name is found
   };
-  
-  
 
   const extractSetNumberFromOCR = (ocrText) => {
     const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g); // Match "163/182" or "036 /419"
