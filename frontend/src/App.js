@@ -114,7 +114,7 @@ function App() {
 
     setLoading(true);
     try {
-      const response = await axios.post("http://127.0.0.1:5000/ocr", formData, {
+      const response = await axios.post("http://127.0.0.1:5001/ocr", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -135,34 +135,21 @@ function App() {
       setLoading(false);
     }
   };
-
+  
   const handleEbaySearch = async () => {
     if (!cardName || !cardSetNumber) {
       alert("Please scan a card to get the card name and set number first.");
       return;
     }
-
-    const query = `${cardName} ${cardSetNumber}`;
-    const ebayAppId = "SamMay-CardScan-SBX-9faa35af2-f7a6d731"; // eBay App ID
-
+  
     setLoading(true);
     try {
-      const response = await axios.get(
-        "https://svcs.ebay.com/services/search/FindingService/v1",
-        {
-          params: {
-            "OPERATION-NAME": "findItemsByKeywords",
-            "SERVICE-VERSION": "1.0.0",
-            "SECURITY-APPNAME": ebayAppId,
-            "RESPONSE-DATA-FORMAT": "JSON",
-            keywords: query,
-          },
-        }
-      );
-
-      const items =
-        response.data?.findItemsByKeywordsResponse[0]?.searchResult[0]?.item || [];
-      setEbayResults(items);
+      const response = await axios.post("http://localhost:5001/api/ebay-search", {
+        cardName,
+        cardSetNumber,
+      });
+  
+      setEbayResults(response.data);
     } catch (error) {
       console.error("Error fetching eBay results:", error);
       alert("Failed to fetch eBay results.");
@@ -170,6 +157,8 @@ function App() {
       setLoading(false);
     }
   };
+  
+  
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
@@ -230,18 +219,23 @@ function App() {
           {loading ? "Searching eBay..." : "Search eBay"}
         </button>
         <ul>
-          {ebayResults.length > 0 ? (
-            ebayResults.map((item, index) => (
-              <li key={index}>
-                <a href={item.viewItemURL[0]} target="_blank" rel="noopener noreferrer">
-                  {item.title[0]} - ${item.sellingStatus[0].currentPrice[0].__value__}
-                </a>
-              </li>
-            ))
-          ) : (
-            <p>No eBay results found.</p>
-          )}
-        </ul>
+  {ebayResults.length > 0 ? (
+    ebayResults.map((item, index) => (
+      <li key={index}>
+        {/* Display eBay item details with correct link */}
+        <a
+          href={item.viewItemURL || "#"}  // Use the eBay URL
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {item.title} - ${item.price} {/* Display title and price */}
+        </a>
+      </li>
+    ))
+  ) : (
+    <p>No eBay results found.</p>
+  )}
+</ul>
       </section>
     </div>
   );
