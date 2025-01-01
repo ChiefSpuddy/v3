@@ -4,17 +4,15 @@ import "./App.css"; // Ensure this file includes the new styles
 
 function App() {
   const [file, setFile] = useState(null);
-  const [filePreview, setFilePreview] = useState(""); // Store the file preview URL
   const [ocrResult, setOcrResult] = useState("");
+  const [cardName, setCardName] = useState(""); // Track the card name
   const [query, setQuery] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
 
   const handleFileChange = (e) => {
-    const uploadedFile = e.target.files[0];
-    setFile(uploadedFile);
-    setFilePreview(URL.createObjectURL(uploadedFile)); // Create a preview URL
+    setFile(e.target.files[0]);
     setFileUploaded(true); // Update file uploaded state
   };
 
@@ -33,7 +31,13 @@ function App() {
       const response = await axios.post("http://127.0.0.1:5000/ocr", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setOcrResult(response.data.text.join(", "));
+
+      const resultText = response.data.text.join(", ");
+      setOcrResult(resultText);
+
+      // Extract card name
+      const name = extractCardName(resultText);
+      setCardName(name);
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
@@ -41,6 +45,22 @@ function App() {
       setLoading(false);
     }
   };
+
+  const extractCardName = (text) => {
+    const entries = text.split(",").map((entry) => entry.trim()); // Split and trim entries
+    for (let i = 0; i < entries.length; i++) {
+      if (
+        i === 1 &&
+        entries[i].toLowerCase() !== "basic" &&
+        entries[i].toLowerCase() !== "trainer"
+      ) {
+        // Remove unwanted characters like '@', "'", etc.
+        return entries[i].replace(/[@'"]/g, "").trim();
+      }
+    }
+    return "Not detected"; // Fallback if no name is found
+  };
+  
 
   const handleSearch = async () => {
     if (!query) {
@@ -74,10 +94,10 @@ function App() {
             />
           </label>
         </div>
-        {filePreview && (
+        {file && (
           <div style={{ marginTop: "10px" }}>
             <img
-              src={filePreview}
+              src={URL.createObjectURL(file)}
               alt="Uploaded File Preview"
               style={{ width: "200px", border: "1px solid #ccc" }}
             />
@@ -92,6 +112,9 @@ function App() {
         </button>
         <p>
           <strong>OCR Result:</strong> {ocrResult}
+        </p>
+        <p>
+          <strong>Card Name:</strong> {cardName}
         </p>
       </section>
 
