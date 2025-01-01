@@ -16,7 +16,7 @@ function App() {
       console.error("Error:", error);
     }
   };
-
+//hello
   return (
     <div>
       <h1>OCR Scanner</h1>
