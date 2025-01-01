@@ -6,14 +6,17 @@ function App() {
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
   const [cardName, setCardName] = useState(""); // Track the card name
+  const [cardSetNumber, setCardSetNumber] = useState(""); // Track the card set number
   const [query, setQuery] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
+  const [scanCompleted, setScanCompleted] = useState(false); // Track scan completion state
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setFileUploaded(true); // Update file uploaded state
+    setScanCompleted(false); // Reset scan completed state
   };
 
   const handleScan = async () => {
@@ -38,6 +41,12 @@ function App() {
       // Extract card name
       const name = extractCardName(resultText);
       setCardName(name);
+
+      // Extract card set number
+      const setNumber = extractCardSetNumber(resultText);
+      setCardSetNumber(setNumber);
+
+      setScanCompleted(true); // Mark scan as completed
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
@@ -47,15 +56,27 @@ function App() {
   };
 
   const extractCardName = (text) => {
-    const exclusions = ["basic", "trainer", "item", "supporter", "utem", "basc", "basig", "iten", "stagg]", "basis", "stage]"]; // Words to ignore
+    const exclusions = [
+      "basic",
+      "trainer",
+      "item",
+      "supporter",
+      "utem",
+      "basc",
+      "basig",
+      "iten",
+      "stagg]",
+      "basis",
+      "stage]",
+    ]; // Words to ignore
     const entries = text.split(",").map((entry) => entry.trim()); // Split and trim entries
-  
+
     // Filter out unwanted entries
     const validEntries = entries.filter((entry) => {
       const lowerCaseEntry = entry.toLowerCase();
       return !exclusions.includes(lowerCaseEntry) && entry.length > 1; // Exclude short or unwanted entries
     });
-  
+
     if (validEntries.length > 0) {
       // Handle multi-word names and add a space before 'EX' (case-insensitive)
       return validEntries[0]
@@ -63,12 +84,16 @@ function App() {
         .replace(/[@'"]/g, "") // Remove unwanted characters
         .trim();
     }
-  
+
     return "Not detected"; // Fallback if no name is found
   };
-  
-  
-  
+
+  const extractCardSetNumber = (text) => {
+    // Regex to match card set numbers like 123/123, 01/123, 123/01, 01/01
+    const regex = /\b\d{1,3}\/\d{1,3}\b/;
+    const match = text.match(regex);
+    return match ? match[0] : "Not detected"; // Return the matched set number or a fallback message
+  };
 
   const handleSearch = async () => {
     if (!query) {
@@ -94,7 +119,12 @@ function App() {
         <h2>OCR Scanner</h2>
         <div className="file-input-container">
           <label className="file-label">
-            {fileUploaded ? "File Uploaded" : "Choose File"} {/* Change text dynamically */}
+            {scanCompleted
+              ? "Upload Another Card"
+              : fileUploaded
+              ? "File Uploaded"
+              : "Choose File"}{" "}
+            {/* Dynamically change text */}
             <input
               type="file"
               className="file-input"
@@ -123,6 +153,9 @@ function App() {
         </p>
         <p>
           <strong>Card Name:</strong> {cardName}
+        </p>
+        <p>
+          <strong>Card Set Number:</strong> {cardSetNumber}
         </p>
       </section>
 
