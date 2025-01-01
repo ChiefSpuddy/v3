@@ -47,19 +47,27 @@ function App() {
   };
 
   const extractCardName = (text) => {
+    const exclusions = ["basic", "trainer", "item", "supporter", "utem", "basc", "basig", "iten", "stagg]", "basis", "stage]"]; // Words to ignore
     const entries = text.split(",").map((entry) => entry.trim()); // Split and trim entries
-    for (let i = 0; i < entries.length; i++) {
-      if (
-        i === 1 &&
-        entries[i].toLowerCase() !== "basic" &&
-        entries[i].toLowerCase() !== "trainer"
-      ) {
-        // Remove unwanted characters like '@', "'", etc.
-        return entries[i].replace(/[@'"]/g, "").trim();
-      }
+  
+    // Filter out unwanted entries
+    const validEntries = entries.filter((entry) => {
+      const lowerCaseEntry = entry.toLowerCase();
+      return !exclusions.includes(lowerCaseEntry) && entry.length > 1; // Exclude short or unwanted entries
+    });
+  
+    if (validEntries.length > 0) {
+      // Handle multi-word names and add a space before 'EX' (case-insensitive)
+      return validEntries[0]
+        .replace(/(ex)$/i, " EX") // Add space before 'EX'
+        .replace(/[@'"]/g, "") // Remove unwanted characters
+        .trim();
     }
+  
     return "Not detected"; // Fallback if no name is found
   };
+  
+  
   
 
   const handleSearch = async () => {
