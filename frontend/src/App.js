@@ -12,8 +12,7 @@ function App() {
   const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
   const [scanCompleted, setScanCompleted] = useState(false); // Track scan completion state
 
-  // Keep exclusions intact
-  const exclusions = ["hp", "cd", "trainer", "basic", "Item", "Stage", "basc", "utem", "iten", "Splash", "Typhoon", "stage]", "basis", "basig"];
+  const exclusions = ["hp", "mp", "stagg]", "stage]", "cd", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig"];
 
   const correctMisreads = (text) => {
     return text
@@ -23,57 +22,53 @@ function App() {
 
   const extractCardNameFromOCR = (ocrText) => {
     const words = ocrText.split(/[ ,\n]+/); // Split by spaces, commas, or newlines
-  
-    // Stopwords to halt name detection
+
     const stopwords = ["TRAINER", "ITEM", "ABILITY", "STAGE", "ATTACK", "DAMAGE", "WEAKNESS", "RESISTANCE"];
-  
-    // Clean and preprocess words
+
     const cleanedWords = words
       .filter((word) => word.length > 1 && !exclusions.includes(word.toLowerCase())) // Exclude unwanted words
       .map((word) => correctMisreads(word)); // Apply corrections
-  
+
     let name = "";
-  
-    // Iterate through cleaned words to find the Pokémon name or valid card name
+
     for (let i = 0; i < cleanedWords.length; i++) {
       const currentWord = cleanedWords[i];
       const nextWord = cleanedWords[i + 1] || "";
-  
-      // Stop at stopwords
+
+      // Skip stopwords but continue searching for valid names
       if (stopwords.includes(currentWord.toUpperCase())) {
-        break;
+        continue;
       }
-  
-      // Two-word names (e.g., "Precious Trolley" or "Pikachu EX")
+
+      // Two-word names (e.g., "Night Stretcher")
       if (/^[A-Z]/.test(currentWord) && /^[A-Z]/.test(nextWord)) {
-        if (nextWord.toUpperCase() === "EX") {
-          name = `${currentWord} ${nextWord}`; // Include "EX" if it directly follows
-        } else {
-          name = `${currentWord} ${nextWord}`;
-        }
+        name = `${currentWord} ${nextWord}`;
         break;
       }
-  
-      // Single-word names (e.g., "Pikachu")
+
+      // Single-word names (fallback if no two-word name is found)
       if (/^[A-Z]/.test(currentWord)) {
         name = currentWord;
         break;
       }
     }
-  
+
     return name || "Not Detected"; // Fallback
   };
 
   const extractSetNumberFromOCR = (ocrText) => {
-    // Match all numbers in the text, excluding years (2020–2029)
-    const numberMatches = ocrText.match(/\b\d{1,4}\b/g); // Match 1 to 4 digit numbers
-    if (!numberMatches) return "Not Detected";
+    const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g); // Match "163/182" or "061 /064"
 
-    // Filter out years (2020–2029)
-    const validNumbers = numberMatches.filter((num) => !(num >= 2020 && num <= 2029));
+    if (!matches) return "Not Detected";
 
-    // Return the last valid number if it exists
-    return validNumbers.length > 0 ? validNumbers[validNumbers.length - 1] : "Not Detected";
+    const validMatches = matches.filter((num) => {
+      if (/^\d+\s?\/\s?\d+$/.test(num)) return true; // Include valid "XXX/YYY" formats
+      return !(num >= 2020 && num <= 2029); // Exclude years
+    });
+
+    const cleanedMatches = validMatches.map((num) => num.replace(/\s?\/\s?/g, "/")); // Normalize spaces around "/"
+
+    return cleanedMatches.length > 0 ? cleanedMatches[cleanedMatches.length - 1] : "Not Detected";
   };
 
   const handleFileChange = (e) => {
@@ -117,32 +112,6 @@ function App() {
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEbaySearch = async () => {
-    if (!cardName || !cardSetNumber) {
-      alert("Please scan a card to get the card name and set number first.");
-      return;
-    }
-
-    const query = `${cardName} ${cardSetNumber}`;
-    console.log("Search Query:", query);
-
-    setLoading(true);
-    try {
-      const response = await axios.get("http://127.0.0.1:5000/ebay", {
-        params: { query },
-      });
-
-      const ebayData = response.data.items || [];
-      console.log("eBay Results:", ebayData);
-      setEbayResults(ebayData);
-    } catch (error) {
-      console.error("Error fetching eBay results:", error);
-      alert("Failed to fetch eBay results.");
     } finally {
       setLoading(false);
     }
@@ -193,32 +162,6 @@ function App() {
         <p>
           <strong>Card Set Number:</strong> {cardSetNumber}
         </p>
-      </section>
-
-      <hr />
-
-      <section>
-        <h2>eBay Results</h2>
-        <button
-          onClick={handleEbaySearch}
-          className={`button ${loading ? "loading" : ""}`}
-          disabled={!cardName || !cardSetNumber || loading}
-        >
-          {loading ? "Searching eBay..." : "Search eBay"}
-        </button>
-        <ul>
-          {ebayResults.length > 0 ? (
-            ebayResults.map((item, index) => (
-              <li key={index}>
-                <a href={item.link} target="_blank" rel="noopener noreferrer">
-                  {item.title} - {item.price}
-                </a>
-              </li>
-            ))
-          ) : (
-            <p>No eBay results found.</p>
-          )}
-        </ul>
       </section>
     </div>
   );
