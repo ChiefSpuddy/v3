@@ -17,6 +17,10 @@ function App() {
     setFile(e.target.files[0]);
     setFileUploaded(true); // Update file uploaded state
     setScanCompleted(false); // Reset scan completed state
+    setOcrResult("");
+    setCardName("");
+    setCardSetNumber("");
+
   };
 
   const handleScan = async () => {
@@ -89,11 +93,14 @@ function App() {
   };
 
   const extractCardSetNumber = (text) => {
-    // Regex to match card set numbers like 123/123, 01/123, 123/01, 01/01
-    const regex = /\b\d{1,3}\/\d{1,3}\b/;
-    const match = text.match(regex);
-    return match ? match[0] : "Not detected"; // Return the matched set number or a fallback message
+    // Enhanced regex to match formats like 123/123, 01/123, 123/SVP, 181/162, etc.
+    const regex = /\b\d{1,3}[\/|\\]\d{1,5}\b/gi; // Includes \ and accounts for varying formats
+    const matches = text.match(regex);
+  
+    // Return the first valid match or a fallback message
+    return matches && matches.length > 0 ? matches[0] : "Not detected";
   };
+  
 
   const handleSearch = async () => {
     if (!query) {
@@ -144,7 +151,7 @@ function App() {
         <button
           onClick={handleScan}
           className={`button ${loading ? "loading" : ""}`}
-          disabled={loading}
+          disabled={!file || loading}
         >
           {loading ? "Scanning..." : "Scan"} {/* Default text is "Scan" */}
         </button>
