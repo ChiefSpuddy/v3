@@ -1,7 +1,10 @@
 from flask import Flask, request, jsonify
 import requests
+from flask_cors import CORS
+import easyocr
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/ocr", methods=["POST"])
 def ocr():
@@ -12,9 +15,10 @@ def ocr():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # EasyOCR logic here (already implemented)
-    # Return OCR results
-    return jsonify({"text": ["Sample OCR Output"]})
+    # EasyOCR logic
+    reader = easyocr.Reader(["en"])
+    results = reader.readtext(file.read(), detail=0)
+    return jsonify({"text": results})
 
 
 @app.route("/ebay", methods=["POST"])
@@ -25,22 +29,15 @@ def ebay_search():
     if not query:
         return jsonify({"error": "No search query provided"}), 400
 
-    # Replace with your eBay credentials
     EBAY_APP_ID = "SamMay-CardScan-SBX-9faa35af2-f7a6d731"
     EBAY_SEARCH_URL = "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search"
 
-    params = {
-        "q": query,
-        "limit": 5,  # Limit to 5 results
-    }
-    headers = {
-        "Authorization": f"Bearer SBX-faa35af2396e-4cb7-429c-a2a3-7c9e",
-    }
+    params = {"q": query, "limit": 5}
+    headers = {"Authorization": f"Bearer SBX-faa35af2396e-4cb7-429c-a2a3-7c9e"}
 
     try:
         response = requests.get(EBAY_SEARCH_URL, headers=headers, params=params)
         response.raise_for_status()
-
         items = [
             {
                 "title": item["title"],
@@ -52,3 +49,7 @@ def ebay_search():
         return jsonify({"items": items})
     except requests.exceptions.RequestException as e:
         return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

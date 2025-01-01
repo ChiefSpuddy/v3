@@ -1,23 +1,88 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from "react";
+import axios from "axios";
 
 function App() {
+  const [file, setFile] = useState(null);
+  const [ocrResult, setOcrResult] = useState("");
+  const [query, setQuery] = useState("");
+  const [ebayResults, setEbayResults] = useState([]);
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleScan = async () => {
+    if (!file) {
+      console.error("No file selected!");
+      alert("Please select a file first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await axios.post("http://127.0.0.1:5000/ocr", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setOcrResult(response.data.text.join(", "));
+    } catch (error) {
+      console.error("Error uploading and scanning file:", error);
+      alert("Failed to scan file.");
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!query) {
+      alert("Please enter a search query.");
+      return;
+    }
+
+    try {
+      const response = await axios.post("http://127.0.0.1:5000/ebay", { query });
+      setEbayResults(response.data.items);
+    } catch (error) {
+      console.error("Error fetching eBay results:", error);
+      alert("Failed to fetch eBay results.");
+    }
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+      <h1>Card Scanner & eBay Search</h1>
+
+      {/* OCR Section */}
+      <section>
+        <h2>OCR Scanner</h2>
+        <input type="file" onChange={handleFileChange} />
+        <button onClick={handleScan}>Upload & Scan</button>
         <p>
-          Edit <code>src/App.js</code> and save to reload.
+          <strong>OCR Result:</strong> {ocrResult}
         </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      </section>
+
+      <hr />
+
+      {/* eBay Search Section */}
+      <section>
+        <h2>eBay Search</h2>
+        <input
+          type="text"
+          placeholder="Enter search query"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <button onClick={handleSearch}>Search</button>
+        <ul>
+          {ebayResults.map((item, index) => (
+            <li key={index}>
+              <a href={item.link} target="_blank" rel="noopener noreferrer">
+                {item.title} - ${item.price}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

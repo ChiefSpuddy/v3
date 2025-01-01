@@ -1,27 +1,55 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import axios from 'axios';
 
 function App() {
-  const [text, setText] = useState("");
+  const [file, setFile] = useState(null);
+  const [webcamEnabled, setWebcamEnabled] = useState(false);
+  const [ocrResult, setOcrResult] = useState('');
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleUpload = async () => {
+    if (!file) return alert('Please select a file first!');
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append('file', file);
 
     try {
-      const response = await axios.post("/ocr", formData);
-      setText(response.data.text);
+      const response = await axios.post('http://127.0.0.1:5000/ocr', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setOcrResult(response.data.text);
     } catch (error) {
-      console.error("Error:", error);
+      console.error('Error uploading file:', error);
+      alert('Failed to process the image!');
     }
   };
-//hello
+
   return (
-    <div>
-      <h1>OCR Scanner</h1>
-      <input type="file" onChange={handleFileUpload} />
-      <p>Detected Text: {text}</p>
+    <div style={{ textAlign: 'center', padding: '20px' }}>
+      <h1>Card Scanner</h1>
+      <div style={{ marginBottom: '20px' }}>
+        <button onClick={() => setWebcamEnabled(!webcamEnabled)}>
+          {webcamEnabled ? 'Disable' : 'Enable'} Webcam
+        </button>
+      </div>
+
+      {webcamEnabled && <p>Webcam functionality coming soon!</p>}
+
+      <div style={{ marginBottom: '20px' }}>
+        <input type="file" onChange={handleFileChange} />
+        <button onClick={handleUpload}>Upload and Scan</button>
+      </div>
+
+      {ocrResult && (
+        <div>
+          <h2>OCR Result:</h2>
+          <pre>{ocrResult}</pre>
+        </div>
+      )}
     </div>
   );
 }
