@@ -1,4 +1,4 @@
-// Full App.js
+// Full App.js with eBay Search Integration
 
 import React, { useState } from "react";
 import axios from "axios";
@@ -37,8 +37,7 @@ function App() {
 
   const extractCardNameFromOCR = (ocrText) => {
     const segments = ocrText.split(","); // Split the OCR text by commas
-  
-    // Stopwords and exclusions to prevent invalid names
+
     const stopwords = [
       "TRAINER",
       "ITEM",
@@ -52,50 +51,31 @@ function App() {
       "HP",
       "BASIC",
     ];
-    const exclusions = [
-      "hp",
-      "trainer",
-      "basic",
-      "item",
-      "stage",
-      "basc",
-      "utem",
-      "iten",
-      "splash",
-      "typhoon",
-      "basis",
-      "basig",
-      "stagg"
-    ];
-  
+
     for (const segment of segments) {
       let trimmedSegment = segment.trim(); // Remove leading and trailing whitespace
-  
-      // Clean special characters from segment (e.g., `'Ceruledge@` becomes `Ceruledge`)
-      trimmedSegment = trimmedSegment.replace(/[^A-Za-z\s]/g, "");
-  
-      // Check if the segment is valid: not in exclusions/stopwords and contains valid text
+
+      trimmedSegment = trimmedSegment.replace(/[^A-Za-z\s]/g, ""); // Clean special characters
+
       if (
         trimmedSegment.length > 1 &&
-        /^[A-Za-z\s]+$/.test(trimmedSegment) && // Include only alphabetic characters
+        /^[A-Za-z\s]+$/.test(trimmedSegment) &&
         !exclusions.includes(trimmedSegment.toLowerCase()) &&
         !stopwords.includes(trimmedSegment.toUpperCase())
       ) {
         const words = trimmedSegment.split(" ");
-  
-        // Handle two-word names (e.g., "Ceruledge EX")
+
         if (words.length > 1 && /^[A-Z]/.test(words[0]) && /^[A-Z]/.test(words[1])) {
           return `${words[0]} ${words[1]}`;
         }
-  
-        // Return single-word name
+
         if (/^[A-Z]/.test(trimmedSegment)) {
           return trimmedSegment;
         }
       }
     }
-  
-    return "Not Detected"; // Fallback if no valid name is found
+
+    return "Not Detected";
   };
 
   const extractSetNumberFromOCR = (ocrText) => {
@@ -139,14 +119,11 @@ function App() {
       });
 
       let resultText = response.data.text.join(", ");
-      resultText = correctMisreads(resultText); // Apply misread corrections
+      resultText = correctMisreads(resultText);
       setOcrResult(resultText);
 
       const name = extractCardNameFromOCR(resultText);
       const setNumber = extractSetNumberFromOCR(resultText);
-
-      console.log("Extracted Card Name:", name);
-      console.log("Extracted Card Set Number:", setNumber);
 
       setCardName(name);
       setCardSetNumber(setNumber);
@@ -154,6 +131,41 @@ function App() {
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEbaySearch = async () => {
+    if (!cardName || !cardSetNumber) {
+      alert("Please scan a card to get the card name and set number first.");
+      return;
+    }
+
+    const query = `${cardName} ${cardSetNumber}`;
+    const ebayAppId = "SamMay-CardScan-SBX-9faa35af2-f7a6d731"; // eBay App ID
+
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        "https://svcs.ebay.com/services/search/FindingService/v1",
+        {
+          params: {
+            "OPERATION-NAME": "findItemsByKeywords",
+            "SERVICE-VERSION": "1.0.0",
+            "SECURITY-APPNAME": ebayAppId,
+            "RESPONSE-DATA-FORMAT": "JSON",
+            keywords: query,
+          },
+        }
+      );
+
+      const items =
+        response.data?.findItemsByKeywordsResponse[0]?.searchResult[0]?.item || [];
+      setEbayResults(items);
+    } catch (error) {
+      console.error("Error fetching eBay results:", error);
+      alert("Failed to fetch eBay results.");
     } finally {
       setLoading(false);
     }
@@ -204,6 +216,32 @@ function App() {
         <p>
           <strong>Card Set Number:</strong> {cardSetNumber}
         </p>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>eBay Results</h2>
+        <button
+          onClick={handleEbaySearch}
+          className={`button ${loading ? "loading" : ""}`}
+          disabled={!cardName || !cardSetNumber || loading}
+        >
+          {loading ? "Searching eBay..." : "Search eBay"}
+        </button>
+        <ul>
+          {ebayResults.length > 0 ? (
+            ebayResults.map((item, index) => (
+              <li key={index}>
+                <a href={item.viewItemURL[0]} target="_blank" rel="noopener noreferrer">
+                  {item.title[0]} - ${item.sellingStatus[0].currentPrice[0].__value__}
+                </a>
+              </li>
+            ))
+          ) : (
+            <p>No eBay results found.</p>
+          )}
+        </ul>
       </section>
     </div>
   );
