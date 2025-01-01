@@ -1,9 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import easyocr
+import requests
 
 app = Flask(__name__)
 CORS(app)
+
+EBAY_APP_ID = "SamMay-CardScan-SBX-9faa35af2-f7a6d731"  # eBay App ID for sandbox testing
+EBAY_SEARCH_URL = "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search"
 
 @app.route("/ocr", methods=["POST"])
 def ocr():
@@ -19,9 +23,59 @@ def ocr():
         reader = easyocr.Reader(["en"])
         results = reader.readtext(file.read(), detail=0)
 
-        return jsonify({"text": results})
+        # Extract card name and set number
+        card_name = extract_card_name(results)
+        card_set_number = extract_card_set_number(results)
+        
+        # Fetch eBay results using the extracted name and set number
+        ebay_results = search_ebay(card_name, card_set_number)
+
+        return jsonify({"text": results, "cardName": card_name, "cardSetNumber": card_set_number, "ebayResults": ebay_results})
     except Exception as e:
         return jsonify({"error": f"Failed to process the file: {str(e)}"}), 500
+
+def search_ebay(card_name, card_set_number):
+    query = f"{card_name} {card_set_number}"
+    params = {
+        "q": query,
+        "limit": 5,
+    }
+    headers = {
+        "Authorization": f"Bearer {EBAY_APP_ID}",
+    }
+
+    try:
+        response = requests.get(EBAY_SEARCH_URL, headers=headers, params=params)
+        response.raise_for_status()
+        items = [
+            {
+                "title": item["title"],
+                "price": item["price"]["value"],
+                "link": item["itemWebUrl"],
+            }
+            for item in response.json().get("itemSummaries", [])
+        ]
+        return items
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)}
+
+def extract_card_name(text):
+    exclusions = [
+        "basic", "trainer", "item", "supporter", "utem", "basc", "basig", "iten", "stagg]", "basis", "stage]",
+    ]
+    # Joining the list of text results into a single string
+    result_str = " ".join(text)
+    # Splitting by spaces and filtering out unwanted entries
+    entries = result_str.split(" ")
+    valid_entries = [entry.strip() for entry in entries if entry.lower() not in exclusions and len(entry) > 1]
+    return valid_entries[0] if valid_entries else "Not Detected"
+
+def extract_card_set_number(text):
+    result_str = " ".join(text)
+    # Regex to match card set numbers (e.g., 037/159)
+    import re
+    matches = re.findall(r'\b\d{1,3}[\/|\\]\d{1,5}\b', result_str)
+    return matches[0] if matches else "Not Detected"
 
 if __name__ == "__main__":
     app.run(debug=True)

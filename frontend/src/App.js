@@ -7,6 +7,7 @@ function App() {
   const [ocrResult, setOcrResult] = useState("");
   const [cardName, setCardName] = useState(""); // Track the card name
   const [cardSetNumber, setCardSetNumber] = useState(""); // Track the card set number
+  const [ebayResults, setEbayResults] = useState([]); // Track eBay results
   const [loading, setLoading] = useState(false);
   const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
   const [scanCompleted, setScanCompleted] = useState(false); // Track scan completion state
@@ -18,6 +19,7 @@ function App() {
     setOcrResult("");
     setCardName("");
     setCardSetNumber("");
+    setEbayResults([]); // Reset eBay results
   };
 
   const handleScan = async () => {
@@ -39,15 +41,16 @@ function App() {
       const resultText = response.data.text.join(", ");
       setOcrResult(resultText);
 
-      // Extract card name
-      const name = extractCardName(resultText);
+      const name = response.data.cardName;
       setCardName(name);
 
-      // Extract card set number
-      const setNumber = extractCardSetNumber(resultText);
+      const setNumber = response.data.cardSetNumber;
       setCardSetNumber(setNumber);
 
-      setScanCompleted(true); // Mark scan as completed
+      const ebayResults = response.data.ebayResults;
+      setEbayResults(ebayResults);
+
+      setScanCompleted(true);
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
@@ -56,42 +59,10 @@ function App() {
     }
   };
 
-  const extractCardName = (text) => {
-    const exclusions = [
-      "basic", "trainer", "item", "supporter", "utem", "basc", "basig", "iten",
-      "stagg]", "basis", "stage]"
-    ]; // Words to ignore
-    const entries = text.split(",").map((entry) => entry.trim()); // Split and trim entries
-
-    // Filter out unwanted entries
-    const validEntries = entries.filter((entry) => {
-      const lowerCaseEntry = entry.toLowerCase();
-      return !exclusions.includes(lowerCaseEntry) && entry.length > 1; // Exclude short or unwanted entries
-    });
-
-    if (validEntries.length > 0) {
-      return validEntries[0]
-        .replace(/(ex)$/i, " EX") // Add space before 'EX'
-        .replace(/[@'"]/g, "") // Remove unwanted characters
-        .trim();
-    }
-
-    return "Not detected"; // Fallback if no name is found
-  };
-
-  const extractCardSetNumber = (text) => {
-    // Enhanced regex to match formats like 123/123, 01/123, 123/SVP, 181/162, etc.
-    const regex = /\b\d{1,3}[\/|\\]\d{1,5}\b/gi; // Includes \ and accounts for varying formats
-    const matches = text.match(regex);
-
-    return matches && matches.length > 0 ? matches[0] : "Not detected";
-  };
-
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h1>Card Scanner</h1>
+      <h1>Card Scanner & eBay Search</h1>
 
-      {/* OCR Section */}
       <section>
         <h2>OCR Scanner</h2>
         <div className="file-input-container">
@@ -100,8 +71,12 @@ function App() {
               ? "Upload Another Card"
               : fileUploaded
               ? "File Uploaded"
-              : "Choose File"}{" "}
-            <input type="file" className="file-input" onChange={handleFileChange} />
+              : "Choose File"}
+            <input
+              type="file"
+              className="file-input"
+              onChange={handleFileChange}
+            />
           </label>
         </div>
         {file && (
@@ -120,9 +95,35 @@ function App() {
         >
           {loading ? "Scanning..." : "Scan"}
         </button>
-        <p><strong>OCR Result:</strong> {ocrResult}</p>
-        <p><strong>Card Name:</strong> {cardName}</p>
-        <p><strong>Card Set Number:</strong> {cardSetNumber}</p>
+        <p>
+          <strong>OCR Result:</strong> {ocrResult}
+        </p>
+        <p>
+          <strong>Card Name:</strong> {cardName}
+        </p>
+        <p>
+          <strong>Card Set Number:</strong> {cardSetNumber}
+        </p>
+      </section>
+
+      <hr />
+
+      {/* eBay Results Section */}
+      <section>
+        <h2>eBay Results</h2>
+        <ul>
+          {ebayResults.length > 0 ? (
+            ebayResults.map((item, index) => (
+              <li key={index}>
+                <a href={item.link} target="_blank" rel="noopener noreferrer">
+                  {item.title} - ${item.price}
+                </a>
+              </li>
+            ))
+          ) : (
+            <p>No eBay results found.</p>
+          )}
+        </ul>
       </section>
     </div>
   );
