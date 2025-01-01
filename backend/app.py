@@ -36,6 +36,7 @@ def ocr():
 
 def search_ebay(card_name, card_set_number):
     query = f"{card_name} {card_set_number}"
+    print(f"Searching eBay for: {query}")  # Debugging log
     params = {
         "q": query,
         "limit": 5,
@@ -46,7 +47,7 @@ def search_ebay(card_name, card_set_number):
 
     try:
         response = requests.get(EBAY_SEARCH_URL, headers=headers, params=params)
-        response.raise_for_status()
+        response.raise_for_status()  # Will raise an exception for a 4xx/5xx response
         items = [
             {
                 "title": item["title"],
@@ -55,24 +56,23 @@ def search_ebay(card_name, card_set_number):
             }
             for item in response.json().get("itemSummaries", [])
         ]
+        print("eBay search response:", response.json())  # Log the full response
         return items
     except requests.exceptions.RequestException as e:
+        print(f"Error with eBay API request: {e}")  # Log any error
         return {"error": str(e)}
 
 def extract_card_name(text):
     exclusions = [
         "basic", "trainer", "item", "supporter", "utem", "basc", "basig", "iten", "stagg]", "basis", "stage]",
     ]
-    # Joining the list of text results into a single string
     result_str = " ".join(text)
-    # Splitting by spaces and filtering out unwanted entries
     entries = result_str.split(" ")
     valid_entries = [entry.strip() for entry in entries if entry.lower() not in exclusions and len(entry) > 1]
     return valid_entries[0] if valid_entries else "Not Detected"
 
 def extract_card_set_number(text):
     result_str = " ".join(text)
-    # Regex to match card set numbers (e.g., 037/159)
     import re
     matches = re.findall(r'\b\d{1,3}[\/|\\]\d{1,5}\b', result_str)
     return matches[0] if matches else "Not Detected"

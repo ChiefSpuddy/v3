@@ -47,13 +47,36 @@ function App() {
       const setNumber = response.data.cardSetNumber;
       setCardSetNumber(setNumber);
 
-      const ebayResults = response.data.ebayResults;
-      setEbayResults(ebayResults);
-
       setScanCompleted(true);
     } catch (error) {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEbaySearch = async () => {
+    if (!cardName || !cardSetNumber) {
+      alert("Please scan a card to get the card name and set number first.");
+      return;
+    }
+
+    const query = `${cardName} ${cardSetNumber}`;
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`
+      );
+
+      // Here you can process the eBay results using a web scraping or parsing service,
+      // or integrate with the eBay API for structured results.
+      // Assuming your backend already provides parsed results:
+      const ebayData = response.data.items || [];
+      setEbayResults(ebayData);
+    } catch (error) {
+      console.error("Error fetching eBay results:", error);
+      alert("Failed to fetch eBay results.");
     } finally {
       setLoading(false);
     }
@@ -111,12 +134,19 @@ function App() {
       {/* eBay Results Section */}
       <section>
         <h2>eBay Results</h2>
+        <button
+          onClick={handleEbaySearch}
+          className={`button ${loading ? "loading" : ""}`}
+          disabled={!cardName || !cardSetNumber || loading}
+        >
+          {loading ? "Searching eBay..." : "Search eBay"}
+        </button>
         <ul>
           {ebayResults.length > 0 ? (
             ebayResults.map((item, index) => (
               <li key={index}>
                 <a href={item.link} target="_blank" rel="noopener noreferrer">
-                  {item.title} - ${item.price}
+                  {item.title} - {item.price}
                 </a>
               </li>
             ))
