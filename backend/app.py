@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
-import requests
 from flask_cors import CORS
 import easyocr
+from ebay_search import search_ebay
 
 app = Flask(__name__)
 CORS(app)
@@ -15,40 +15,30 @@ def ocr():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # EasyOCR logic
-    reader = easyocr.Reader(["en"])
-    results = reader.readtext(file.read(), detail=0)
-    return jsonify({"text": results})
+    try:
+        # EasyOCR logic
+        reader = easyocr.Reader(["en"])
+        results = reader.readtext(file.read(), detail=0)
+        return jsonify({"text": results})
+    except Exception as e:
+        return jsonify({"error": f"Failed to process the file: {str(e)}"}), 500
 
 
 @app.route("/ebay", methods=["POST"])
 def ebay_search():
     data = request.json
-    query = data.get("query")
+    card_name = data.get("cardName")
+    card_set_number = data.get("cardSetNumber")
+    
+    if not card_name or not card_set_number:
+        return jsonify({"error": "Card name or set number not provided"}), 400
 
-    if not query:
-        return jsonify({"error": "No search query provided"}), 400
+    query = f"{card_name} {card_set_number}"  # Combine name and set number to form the search query
 
-    EBAY_APP_ID = "SamMay-CardScan-SBX-9faa35af2-f7a6d731"
-    EBAY_SEARCH_URL = "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search"
+    # Use the search_ebay function from ebay_search.py
+    search_results = search_ebay(query)
 
-    params = {"q": query, "limit": 5}
-    headers = {"Authorization": f"Bearer SBX-faa35af2396e-4cb7-429c-a2a3-7c9e"}
-
-    try:
-        response = requests.get(EBAY_SEARCH_URL, headers=headers, params=params)
-        response.raise_for_status()
-        items = [
-            {
-                "title": item["title"],
-                "price": item["price"]["value"],
-                "link": item["itemWebUrl"],
-            }
-            for item in response.json().get("itemSummaries", [])
-        ]
-        return jsonify({"items": items})
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(search_results)
 
 
 if __name__ == "__main__":
