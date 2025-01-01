@@ -8,9 +8,11 @@ function App() {
   const [query, setQuery] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
+    setFileUploaded(true); // Update file uploaded state
   };
 
   const handleScan = async () => {
@@ -61,7 +63,7 @@ function App() {
         <h2>OCR Scanner</h2>
         <div className="file-input-container">
           <label className="file-label">
-            Choose File
+            {fileUploaded ? "File Uploaded" : "Choose File"} {/* Change text dynamically */}
             <input
               type="file"
               className="file-input"
@@ -74,7 +76,7 @@ function App() {
           className={`button ${loading ? "loading" : ""}`}
           disabled={loading}
         >
-          {loading ? "Scanning..." : "Upload & Scan"}
+          {loading ? "Scanning..." : "Scan"} {/* Default text is "Scan" */}
         </button>
         <p>
           <strong>OCR Result:</strong> {ocrResult}
