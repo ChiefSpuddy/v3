@@ -163,7 +163,7 @@ function Scanner() {
         </div>
 
         <div style={{ marginTop: "20px" }}>
-    <h3>Or Use Webcam</h3>
+    <h3>Or, use your webcam to take a pictuire of your card.</h3>
     <WebcamComponent 
       onCapture={(capturedFile) => {
         setFile(capturedFile);
