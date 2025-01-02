@@ -3,8 +3,10 @@ import Home from './pages/Home';
 import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import axios from "axios";
+import WebcamComponent from './Components/WebcamComponent';
 import Navbar from './Components/Navbar';
 import pikachuRun from './Assets/pikachu-run.gif';
+
 
 function Scanner() {
   const [file, setFile] = useState(null);
@@ -17,6 +19,8 @@ function Scanner() {
   const [fileUploaded, setFileUploaded] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
   const [ebaySearchCompleted, setEbaySearchCompleted] = useState(false); // Track eBay search completion
+  const [devices, setDevices] = useState([]);
+  const [selectedDevice, setSelectedDevice] = useState(null);
 
   const exclusions = [
     "hp", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig",
@@ -157,6 +161,24 @@ function Scanner() {
             />
           </label>
         </div>
+
+        <div style={{ marginTop: "20px" }}>
+    <h3>Or Use Webcam</h3>
+    <WebcamComponent 
+      onCapture={(capturedFile) => {
+        setFile(capturedFile);
+        setFileUploaded(true);
+        setScanCompleted(false);
+        setOcrResult("");
+        setCardName("");
+        setCardSetNumber("");
+        setEbayResults([]);
+        setEbaySearchCompleted(false);
+      }} 
+    />
+  </div>
+
+  
 
         {file && (
           <div style={{ marginTop: "10px" }}>

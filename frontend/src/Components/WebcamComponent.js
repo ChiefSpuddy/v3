@@ -1,14 +1,39 @@
-// Components/WebcamComponent.js
 import React, { useState, useRef } from "react";
 
 function WebcamComponent({ onCapture }) {
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [stream, setStream] = useState(null);
+  const [devices, setDevices] = useState([]);
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const videoRef = useRef(null);
+
+  const getDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setDevices(videoDevices);
+      setShowDeviceSelector(true);
+      if (videoDevices.length > 0) {
+        setSelectedDevice(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error("Error getting devices:", err);
+    }
+  };
+
+  const handleDeviceSelect = (deviceId) => {
+    setSelectedDevice(deviceId);
+    setShowDeviceSelector(false);
+    startWebcam();
+  };
 
   const startWebcam = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const constraints = {
+        video: selectedDevice ? { deviceId: { exact: selectedDevice } } : true
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(stream);
       setIsWebcamActive(true);
       if (videoRef.current) {
@@ -30,70 +55,53 @@ function WebcamComponent({ onCapture }) {
 
   const captureImage = () => {
     if (videoRef.current) {
-      const canvas = document.createElement("canvas");
+      const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext("2d");
-
-      // Draw the video frame to the canvas
+      const ctx = canvas.getContext('2d');
       ctx.drawImage(videoRef.current, 0, 0);
-
-      // Overlay grid lines
-      ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-      ctx.lineWidth = 2;
-      const gridSize = 3;
-      const stepX = canvas.width / gridSize;
-      const stepY = canvas.height / gridSize;
-
-      for (let i = 1; i < gridSize; i++) {
-        ctx.beginPath();
-        ctx.moveTo(stepX * i, 0);
-        ctx.lineTo(stepX * i, canvas.height);
-        ctx.moveTo(0, stepY * i);
-        ctx.lineTo(canvas.width, stepY * i);
-        ctx.stroke();
-      }
-
-      canvas.toBlob(
-        (blob) => {
-          const file = new File([blob], "webcam-capture.jpg", {
-            type: "image/jpeg",
-          });
-          onCapture(file);
-          stopWebcam();
-        },
-        "image/jpeg"
-      );
+      
+      canvas.toBlob(blob => {
+        const file = new File([blob], "webcam-capture.jpg", { type: "image/jpeg" });
+        onCapture(file);
+        stopWebcam();
+      }, 'image/jpeg');
     }
   };
 
   return (
     <div>
       {!isWebcamActive ? (
-        <button onClick={startWebcam} className="button">
-          Start Webcam
-        </button>
+        <div>
+          {!showDeviceSelector ? (
+            <button onClick={getDevices} className="button">Start Webcam</button>
+          ) : (
+            <div className="webcam-controls">
+              <select
+                className="webcam-device-select"
+                value={selectedDevice}
+                onChange={(e) => handleDeviceSelect(e.target.value)}
+              >
+                {devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Camera ${devices.indexOf(device) + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       ) : (
         <>
           <video
             ref={videoRef}
             autoPlay
             playsInline
-            style={{
-              width: "100%",
-              maxWidth: "400px",
-              border: "2px solid #ccc",
-              borderRadius: "8px",
-              marginBottom: "10px",
-            }}
+            style={{ width: '300px', marginBottom: '10px', border: '1px solid #ccc' }}
           />
           <div>
-            <button onClick={captureImage} className="button">
-              Capture Image
-            </button>
-            <button onClick={stopWebcam} className="button">
-              Stop Webcam
-            </button>
+            <button onClick={captureImage} className="button">Capture</button>
+            <button onClick={stopWebcam} className="button">Cancel</button>
           </div>
         </>
       )}
