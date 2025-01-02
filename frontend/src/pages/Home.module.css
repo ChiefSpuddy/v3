@@ -5,33 +5,35 @@
   justify-content: center;
   height: 100vh;
   text-align: center;
-  background-color: #f9f9f9;
+  background-color: rgb(255, 255, 255); /* Changed background to red for testing */
 }
 
-.home-container .home-heading {
+
+.home-heading {
   font-size: 2.5rem;
   margin-bottom: 20px;
   color: #333;
 }
 
-.home-container .home-paragraph {
+.home-paragraph {
   font-size: 1.2rem;
   margin-bottom: 20px;
   color: #555;
 }
 
-.home-container .home-button {
-  padding: 10px 20px;
-  font-size: 1rem;
+.home-link {
+  display: inline-block;
+  padding: 15px 30px;
+  font-size: 16px;
   background-color: #007bff;
   color: white;
   border: none;
   border-radius: 5px;
-  cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.3s;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.home-container .home-button:hover {
+.home-link:hover {
   background-color: #0056b3;
 }

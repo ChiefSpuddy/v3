@@ -1,23 +1,12 @@
 // Full App.js with eBay Search Integration and Routing
 
+import "./App.css";
+import Home from './pages/Home';
 import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
 import axios from "axios";
-import "./App.css";
 import Navbar from './Components/Navbar';
 
-// Home Component
-function Home() {
-  return (
-    <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h1>Welcome to the Card Scanning App</h1>
-      <p>Use this app to scan and manage your Pokémon card collection.</p>
-      <Link to="/scanner">
-        <button className="button">Go to Card Scanner</button>
-      </Link>
-    </div>
-  );
-}
 
 // Scanner Component
 function Scanner() {
@@ -264,9 +253,10 @@ function AppWrapper() {
     <Router>
       <Navbar />
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/scanner" element={<Scanner />} />
-      </Routes>
+  <Route path="/" element={<Home />} />
+  <Route path="/scanner" element={<Scanner />} />
+</Routes>
+
     </Router>
   );
 }
