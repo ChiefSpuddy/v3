@@ -75,6 +75,8 @@ function Scanner() {
   };
 
   const handleFileChange = (e) => {
+    // Clear any existing webcam captures
+    setFile(null); 
     setFile(e.target.files[0]);
     setFileUploaded(true);
     setScanCompleted(false);
