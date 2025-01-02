@@ -16,6 +16,7 @@ function Scanner() {
   const [ebayLoading, setEbayLoading] = useState(false); // Separate loading state for eBay search
   const [fileUploaded, setFileUploaded] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
+  const [ebaySearchCompleted, setEbaySearchCompleted] = useState(false); // Track eBay search completion
 
   const exclusions = [
     "hp", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig",
@@ -80,6 +81,7 @@ function Scanner() {
     setCardName("");
     setCardSetNumber("");
     setEbayResults([]);
+    setEbaySearchCompleted(false);
   };
 
   const handleScan = async () => {
@@ -130,7 +132,7 @@ function Scanner() {
 
       console.log("eBay API Response:", response.data);
       setEbayResults(response.data);
-      console.log(response.data); // Check if viewItemURL exists and is valid
+      setEbaySearchCompleted(true);
     } catch (error) {
       console.error("Error fetching eBay results:", error);
       alert("Failed to fetch eBay results.");
@@ -184,77 +186,80 @@ function Scanner() {
           </div>
         )}
 
-        <p>
-          <strong>Card Name:</strong> {cardName}
-        </p>
-        <p>
-          <strong>Card Set Number:</strong> {cardSetNumber}
-        </p>
+        {scanCompleted && (
+          <>
+            <p>
+              <strong>Card Name:</strong> {cardName}
+            </p>
+            <p>
+              <strong>Card Set Number:</strong> {cardSetNumber}
+            </p>
+          </>
+        )}
       </section>
 
       <hr />
 
-
       <section>
-  <h2>eBay Results</h2>
-  <button
-    onClick={handleEbaySearch}
-    className={`button ${ebayLoading ? "loading" : ""}`}
-    disabled={!cardName || !cardSetNumber || ebayLoading}
-  >
-    {ebayLoading ? "Searching eBay..." : "Search eBay"}
-  </button>
+        <h2>eBay Results</h2>
+        <button
+          onClick={handleEbaySearch}
+          className={`button ${ebayLoading ? "loading" : ""}`}
+          disabled={!cardName || !cardSetNumber || ebayLoading}
+        >
+          {ebayLoading ? "Searching eBay..." : "Search eBay"}
+        </button>
 
-  {ebayLoading && (
-    <div style={{ marginTop: "20px", textAlign: "center" }}>
-      <img
-        src={pikachuRun}
-        alt="Loading..."
-        style={{ width: "120px", height: "auto" }}
-      />
-    </div>
-  )}
+        {ebayLoading && (
+          <div style={{ marginTop: "20px", textAlign: "center" }}>
+            <img
+              src={pikachuRun}
+              alt="Loading..."
+              style={{ width: "120px", height: "auto" }}
+            />
+          </div>
+        )}
 
-<div className="ebay-results">
-  <ul style={{ listStyle: 'none', padding: 0 }}>
-    {ebayResults.length > 0 ? (
-      ebayResults.map((item, index) => (
-        <li key={index} style={{ margin: '10px 0' }}>
-          <a
-            href={item.url}  // Changed from viewItemURL to url
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: '#0066c0',
-              textDecoration: 'none',
-              display: 'block',
-              padding: '10px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: '#ffffff',
-              transition: 'background-color 0.3s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f5f5f5';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = '#ffffff';
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>{item.title}</span>
-              <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
-            </div>
-          </a>
-        </li>
-      ))
-    ) : (
-      <p>No eBay results found.</p>
-    )}
-  </ul>
-</div>
-</section>
+        <div className="ebay-results">
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {ebayResults.length > 0 ? (
+              ebayResults.map((item, index) => (
+                <li key={index} style={{ margin: '10px 0' }}>
+                  <a
+                    href={item.url}  // Changed from viewItemURL to url
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#0066c0',
+                      textDecoration: 'none',
+                      display: 'block',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: '#ffffff',
+                      transition: 'background-color 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#ffffff';
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{item.title}</span>
+                      <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
+                    </div>
+                  </a>
+                </li>
+              ))
+            ) : (
+              ebaySearchCompleted && <p>No eBay results found.</p>
+            )}
+          </ul>
+        </div>
+      </section>
     </div>
   );
 }
