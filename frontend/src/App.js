@@ -1,66 +1,38 @@
-// Full App.js with eBay Search Integration and Routing
-
 import "./App.css";
 import Home from './pages/Home';
 import React, { useState } from "react";
-import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import axios from "axios";
 import Navbar from './Components/Navbar';
 
-
-// Scanner Component
 function Scanner() {
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
-  const [cardName, setCardName] = useState(""); // Track the card name
-  const [cardSetNumber, setCardSetNumber] = useState(""); // Track the card set number
-  const [ebayResults, setEbayResults] = useState([]); // Track eBay results
+  const [cardName, setCardName] = useState("");
+  const [cardSetNumber, setCardSetNumber] = useState("");
+  const [ebayResults, setEbayResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fileUploaded, setFileUploaded] = useState(false); // Track file upload state
-  const [scanCompleted, setScanCompleted] = useState(false); // Track scan completion state
+  const [fileUploaded, setFileUploaded] = useState(false);
+  const [scanCompleted, setScanCompleted] = useState(false);
 
   const exclusions = [
-    "hp",
-    "trainer",
-    "basic",
-    "item",
-    "stage",
-    "basc",
-    "utem",
-    "iten",
-    "splash",
-    "typhoon",
-    "basis",
-    "basig",
+    "hp", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig",
   ];
 
   const correctMisreads = (text) => {
     return text
-      .replace(/([a-zA-Z])eX\b/gi, "$1 EX") // Add space before "EX" in cases like "LatiaseX"
-      .replace(/\bex\b/gi, " EX"); // Ensure "EX" is properly formatted with a leading space
+      .replace(/([a-zA-Z])eX\b/gi, "$1 EX")
+      .replace(/\bex\b/gi, " EX");
   };
 
   const extractCardNameFromOCR = (ocrText) => {
-    const segments = ocrText.split(","); // Split the OCR text by commas
-
+    const segments = ocrText.split(",");
     const stopwords = [
-      "TRAINER",
-      "ITEM",
-      "STAGE",
-      "ABILITY",
-      "ATTACK",
-      "DAMAGE",
-      "WEAKNESS",
-      "RESISTANCE",
-      "CD",
-      "HP",
-      "BASIC",
+      "TRAINER", "ITEM", "STAGE", "ABILITY", "ATTACK", "DAMAGE", "WEAKNESS", "RESISTANCE", "CD", "HP", "BASIC",
     ];
 
     for (const segment of segments) {
-      let trimmedSegment = segment.trim(); // Remove leading and trailing whitespace
-
-      trimmedSegment = trimmedSegment.replace(/[^A-Za-z\s]/g, ""); // Clean special characters
+      let trimmedSegment = segment.trim().replace(/[^A-Za-z\s]/g, "");
 
       if (
         trimmedSegment.length > 1 &&
@@ -84,16 +56,16 @@ function Scanner() {
   };
 
   const extractSetNumberFromOCR = (ocrText) => {
-    const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g); // Match "163/182" or "036 /419"
+    const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g);
 
     if (!matches) return "Not Detected";
 
     const validMatches = matches.filter((num) => {
-      if (/^\d+\s?\/\s?\d+$/.test(num)) return true; // Include valid "XXX/YYY" formats
-      return !(num >= 2020 && num <= 2029); // Exclude years
+      if (/^\d+\s?\/\s?\d+$/.test(num)) return true;
+      return !(num >= 2020 && num <= 2029);
     });
 
-    const cleanedMatches = validMatches.map((num) => num.replace(/\s?\/\s?/g, "/")); // Normalize spaces around "/"
+    const cleanedMatches = validMatches.map((num) => num.replace(/\s?\/\s?/g, "/"));
 
     return cleanedMatches.length > 0 ? cleanedMatches[cleanedMatches.length - 1] : "Not Detected";
   };
@@ -142,21 +114,18 @@ function Scanner() {
   };
 
   const handleEbaySearch = async () => {
-    console.log("Card Name:", cardName);
-    console.log("Card Set Number:", cardSetNumber);
     if (!cardName || !cardSetNumber) {
       alert("Please scan a card to get the card name and set number first.");
       return;
     }
-  
+
     setLoading(true);
     try {
       const response = await axios.post("http://localhost:5001/api/ebay-search", {
         cardName,
         cardSetNumber,
       });
-  
-      console.log("eBay Results:", response.data);
+
       setEbayResults(response.data);
     } catch (error) {
       console.error("Error fetching eBay results:", error);
@@ -165,14 +134,13 @@ function Scanner() {
       setLoading(false);
     }
   };
-  
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+    <div className="app-container">
       <h1>Card Scanner & eBay Search</h1>
 
       <section>
-        <h2>OCR Scanner</h2>
+        <h2>Card Scanner</h2>
         <div className="file-input-container">
           <label className="file-label">
             {scanCompleted
@@ -180,11 +148,7 @@ function Scanner() {
               : fileUploaded
               ? "File Uploaded"
               : "Choose File"}
-            <input
-              type="file"
-              className="file-input"
-              onChange={handleFileChange}
-            />
+            <input type="file" className="file-input" onChange={handleFileChange} />
           </label>
         </div>
         {file && (
@@ -203,9 +167,7 @@ function Scanner() {
         >
           {loading ? "Scanning..." : "Scan"}
         </button>
-        <p>
-          <strong>OCR Result:</strong> {ocrResult}
-        </p>
+
         <p>
           <strong>Card Name:</strong> {cardName}
         </p>
@@ -217,46 +179,47 @@ function Scanner() {
       <hr />
 
       <section>
-        <h2>eBay Results</h2>
-        <button
-          onClick={handleEbaySearch}
-          className={`button ${loading ? "loading" : ""}`}
-          disabled={!cardName || !cardSetNumber || loading}
-        >
-          {loading ? "Searching eBay..." : "Search eBay"}
-        </button>
-        <ul>
-  {ebayResults.length > 0 ? (
-    ebayResults.map((item, index) => (
-      <li key={index}>
-        <a
-          href={item.viewItemURL || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {item.title} - ${item.price}
-        </a>
-      </li>
-    ))
-  ) : (
-    <p>No eBay results found.</p>
-  )}
-</ul>
-      </section>
+  <h2>eBay Results</h2>
+  <button
+    onClick={handleEbaySearch}
+    className={`button ${loading ? "loading" : ""}`}
+    disabled={!cardName || !cardSetNumber || loading}
+  >
+    {loading ? "Searching eBay..." : "Search eBay"}
+  </button>
+  <div className="ebay-results">
+    <ul>
+      {ebayResults.length > 0 ? (
+        ebayResults.map((item, index) => (
+          <li key={index}>
+            <a
+              href={item.viewItemURL || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {item.title} - ${item.price}
+            </a>
+          </li>
+        ))
+      ) : (
+        <p>No eBay results found.</p>
+      )}
+    </ul>
+  </div>
+</section>
+
     </div>
   );
 }
 
-// Main App Wrapper
 function AppWrapper() {
   return (
     <Router>
       <Navbar />
       <Routes>
-  <Route path="/" element={<Home />} />
-  <Route path="/scanner" element={<Scanner />} />
-</Routes>
-
+        <Route path="/" element={<Home />} />
+        <Route path="/scanner" element={<Scanner />} />
+      </Routes>
     </Router>
   );
 }

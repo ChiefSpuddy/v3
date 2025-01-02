@@ -1,132 +1,89 @@
-.App {
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(to bottom, #57c7f1, #2a9df4);
+  color: #333;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.app-container {
+  margin-top: 70px; /* Adjust to match navbar height */
+  text-align: center;
+  padding: 20px;
+  min-height: calc(100vh - 70px); /* Ensures the content fills the screen */
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  justify-content: flex-start; /* Centers content vertically */
 }
 
-.App-link {
-  color: #61dafb;
+h1, h2 {
+  margin: 10px 0;
+  color: #000000;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+section {
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  max-width: 600px;
+  width: 100%;
 }
 
-/* Unified Button Styles */
-.button,
-.file-label {
+button, .file-label {
   display: inline-block;
-  position: relative;
-  padding: 15px 30px;
+  padding: 12px 25px;
   font-size: 16px;
+  color: #fff;
+  background-color: #007bff;
   border: none;
-  background-color: #3498db;
-  color: white;
-  cursor: pointer;
-  outline: none;
   border-radius: 5px;
-  text-align: center;
-  transition: background-color 0.3s;
-  margin-right: 10px; /* Add spacing between buttons */
-}
-
-.button:last-of-type {
-  margin-right: 0; /* Remove margin from the last button if necessary */
-}
-
-
-.button:disabled,
-.file-label:disabled {
-  background-color: #95a5a6;
-  cursor: not-allowed;
-}
-
-.button:hover,
-.file-label:hover {
-  background-color: #2980b9;
-}
-
-.button:active,
-.file-label:active {
-  background-color: #1c6ea4;
-}
-
-.button.loading {
-  background-color: #2980b9;
-}
-
-.button.loading::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 15px;
-  width: 10px;
-  height: 10px;
-  border: 2px solid white;
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 0.6s linear infinite;
-  transform: translateY(-50%);
-}
-
-@keyframes spin {
-  0% {
-    transform: translateY(-50%) rotate(0deg);
-  }
-  100% {
-    transform: translateY(-50%) rotate(360deg);
-  }
-}
-
-/* File Input Specific Styles */
-.file-input-container {
-  position: relative;
-  display: inline-block;
-}
-
-.file-input {
-  opacity: 0;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  pointer-events: none; /* Ensure it doesn’t interfere with interactions */
+button:hover, .file-label:hover {
+  background-color: #0056b3;
 }
 
+.file-label {
+  margin-bottom: 10px;
+}
 
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+li {
+  margin: 5px 0;
+  color: #333;
+}
+
+.ebay-results {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.ebay-results ul {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+}
+
+.ebay-results li {
+  margin: 5px 10px;
+  flex: 1 0 45%; /* Ensures results split into columns */
+  overflow: hidden; /* Prevents overflowing text */
+  text-overflow: ellipsis; /* Adds ellipsis to long text */
+  white-space: nowrap;
+}

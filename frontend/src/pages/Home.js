@@ -1,12 +1,14 @@
 import React from 'react';
 import styles from './Home.module.css';
+import pikachuBaloon from '../Assets/pikachu-baloon.gif';
 
 const Home = () => {
   return (
     <div className={styles['home-container']}>
-      <h1 className={styles['home-heading']}>Welcome to the Home Page</h1>
-      <p className={styles['home-paragraph']}>This is a paragraph on the home page.</p>
-      <a href="/about" className={styles['home-link']}>Go to About Page</a>
+      <img src={pikachuBaloon} alt="Pikachu Baloon" className={styles['home-gif']} />
+      <h1 className={styles['home-heading']}>Welcome to Spuds Card Hub</h1>
+      <p className={styles['home-paragraph']}>Card Scanner - WIP</p>
+      <a href="/scanner" className={styles['home-link']}>Go to Card Scanner</a>
     </div>
   );
 };
