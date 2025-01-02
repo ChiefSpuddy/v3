@@ -1,7 +1,7 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: linear-gradient(to bottom, #57c7f1, #2a9df4);
+  background: linear-gradient(to bottom, #d6f4ff, #2a9df4);
   color: #333;
   text-align: center;
 }
@@ -86,4 +86,18 @@ li {
   overflow: hidden; /* Prevents overflowing text */
   text-overflow: ellipsis; /* Adds ellipsis to long text */
   white-space: nowrap;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.file-label {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-block;
+  font-size: 16px;
 }

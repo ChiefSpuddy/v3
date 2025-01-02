@@ -5,7 +5,7 @@
   justify-content: center;
   height: 100vh;
   text-align: center;
-  background-color: rgb(255, 255, 255); /* Changed background to red for testing */
+  background: linear-gradient(to bottom, #d6f4ff, #2a9df4);
 }
 
 
