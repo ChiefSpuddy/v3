@@ -12,8 +12,8 @@ function Scanner() {
   const [cardName, setCardName] = useState("");
   const [cardSetNumber, setCardSetNumber] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
-  const [loadingScan, setLoadingScan] = useState(false); // Separate loading state for Scan button
-  const [loadingEbay, setLoadingEbay] = useState(false); // Separate loading state for eBay Search button
+  const [scanLoading, setScanLoading] = useState(false); // Separate loading state for scanning
+  const [ebayLoading, setEbayLoading] = useState(false); // Separate loading state for eBay search
   const [fileUploaded, setFileUploaded] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
 
@@ -82,16 +82,6 @@ function Scanner() {
     setEbayResults([]);
   };
 
-  const handleNewUpload = () => {
-    setFile(null);
-    setFileUploaded(false);
-    setScanCompleted(false);
-    setOcrResult("");
-    setCardName("");
-    setCardSetNumber("");
-    setEbayResults([]);
-  };
-
   const handleScan = async () => {
     if (!file) {
       alert("Please select a file first.");
@@ -101,7 +91,7 @@ function Scanner() {
     const formData = new FormData();
     formData.append("file", file);
 
-    setLoadingScan(true); // Start scan loading state
+    setScanLoading(true); // Start scan loading state
     try {
       const response = await axios.post("http://127.0.0.1:5001/ocr", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -121,7 +111,7 @@ function Scanner() {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
     } finally {
-      setLoadingScan(false); // Stop scan loading state
+      setScanLoading(false); // Stop scan loading state
     }
   };
 
@@ -131,20 +121,21 @@ function Scanner() {
       return;
     }
 
-    setLoadingEbay(true); // Start eBay search loading state
+    setEbayLoading(true); // Start eBay loading state
     try {
       const response = await axios.post("http://localhost:5001/api/ebay-search", {
         cardName,
         cardSetNumber,
       });
 
+      console.log("eBay API Response:", response.data);
       setEbayResults(response.data);
-      console.log(response.data); // Check if viewItemURL exists and is valid      
+      console.log(response.data); // Check if viewItemURL exists and is valid
     } catch (error) {
       console.error("Error fetching eBay results:", error);
       alert("Failed to fetch eBay results.");
     } finally {
-      setLoadingEbay(false); // Stop eBay search loading state
+      setEbayLoading(false); // Stop eBay loading state
     }
   };
 
@@ -176,14 +167,14 @@ function Scanner() {
         )}
         <button
           onClick={handleScan}
-          className={`button ${loadingScan ? "loading" : ""}`}
-          disabled={!file || loadingScan}
+          className={`button ${scanLoading ? "loading" : ""}`}
+          disabled={!file || scanLoading}
         >
-          {loadingScan ? "Scanning..." : "Scan"}
+          {scanLoading ? "Scanning..." : "Scan"}
         </button>
 
         {/* Pikachu-run GIF while scanning */}
-        {loadingScan && (
+        {scanLoading && (
           <div style={{ marginTop: "20px", textAlign: "center" }}>
             <img
               src={pikachuRun}
@@ -203,40 +194,67 @@ function Scanner() {
 
       <hr />
 
+
       <section>
-        <h2>eBay Results</h2>
-        <button
-          onClick={handleEbaySearch}
-          className={`button ${loadingEbay ? "loading" : ""}`}
-          disabled={!cardName || !cardSetNumber || loadingEbay}
-        >
-          {loadingEbay ? "Searching eBay..." : "Search eBay"}
-        </button>
-        <div className="ebay-results">
-        <ul>
-  {ebayResults.length > 0 ? (
-    ebayResults.map((item, index) => (
-      <li key={index}>
-        <a
-          href={item.viewItemURL}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "blue", cursor: "pointer" }}
-        >
-          {item.title} - ${item.price}
-        </a>
-      </li>
-    ))
-  ) : (
-    <p>No eBay results found.</p>
+  <h2>eBay Results</h2>
+  <button
+    onClick={handleEbaySearch}
+    className={`button ${ebayLoading ? "loading" : ""}`}
+    disabled={!cardName || !cardSetNumber || ebayLoading}
+  >
+    {ebayLoading ? "Searching eBay..." : "Search eBay"}
+  </button>
+
+  {ebayLoading && (
+    <div style={{ marginTop: "20px", textAlign: "center" }}>
+      <img
+        src={pikachuRun}
+        alt="Loading..."
+        style={{ width: "120px", height: "auto" }}
+      />
+    </div>
   )}
-</ul>
 
-
-
+<div className="ebay-results">
+  <ul style={{ listStyle: 'none', padding: 0 }}>
+    {ebayResults.length > 0 ? (
+      ebayResults.map((item, index) => (
+        <li key={index} style={{ margin: '10px 0' }}>
+          <a
+            href={item.url}  // Changed from viewItemURL to url
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: '#0066c0',
+              textDecoration: 'none',
+              display: 'block',
+              padding: '10px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              backgroundColor: '#ffffff',
+              transition: 'background-color 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f5f5f5';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = '#ffffff';
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>{item.title}</span>
+              <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
+            </div>
+          </a>
+        </li>
+      ))
+    ) : (
+      <p>No eBay results found.</p>
+    )}
+  </ul>
 </div>
-
-      </section>
+</section>
     </div>
   );
 }

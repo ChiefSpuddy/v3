@@ -101,3 +101,45 @@ li {
   display: inline-block;
   font-size: 16px;
 }
+
+a {
+  pointer-events: auto;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+.ebay-results ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ebay-results li {
+  margin: 5px 0;
+}
+
+.ebay-results a {
+  pointer-events: all !important;
+}
+
+.ebay-results a:hover {
+  text-decoration: underline;
+}
+
+.ebay-link {
+  color: #0066c0;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  padding: 8px;
+  margin: 4px 0;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+}
+
+.ebay-link:hover {
+  background-color: #e9ecef;
+  text-decoration: underline;
+}
