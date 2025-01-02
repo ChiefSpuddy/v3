@@ -7,20 +7,17 @@ import WebcamComponent from './Components/WebcamComponent';
 import Navbar from './Components/Navbar';
 import pikachuRun from './Assets/pikachu-run.gif';
 
-
 function Scanner() {
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
   const [cardName, setCardName] = useState("");
   const [cardSetNumber, setCardSetNumber] = useState("");
   const [ebayResults, setEbayResults] = useState([]);
-  const [scanLoading, setScanLoading] = useState(false); // Separate loading state for scanning
-  const [ebayLoading, setEbayLoading] = useState(false); // Separate loading state for eBay search
+  const [scanLoading, setScanLoading] = useState(false);
+  const [ebayLoading, setEbayLoading] = useState(false);
   const [fileUploaded, setFileUploaded] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
-  const [ebaySearchCompleted, setEbaySearchCompleted] = useState(false); // Track eBay search completion
-  const [devices, setDevices] = useState([]);
-  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [ebaySearchCompleted, setEbaySearchCompleted] = useState(false);
 
   const exclusions = [
     "hp", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig",
@@ -97,7 +94,7 @@ function Scanner() {
     const formData = new FormData();
     formData.append("file", file);
 
-    setScanLoading(true); // Start scan loading state
+    setScanLoading(true);
     try {
       const response = await axios.post("http://127.0.0.1:5001/ocr", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -117,7 +114,7 @@ function Scanner() {
       console.error("Error uploading and scanning file:", error);
       alert("Failed to scan file.");
     } finally {
-      setScanLoading(false); // Stop scan loading state
+      setScanLoading(false);
     }
   };
 
@@ -127,21 +124,20 @@ function Scanner() {
       return;
     }
 
-    setEbayLoading(true); // Start eBay loading state
+    setEbayLoading(true);
     try {
       const response = await axios.post("http://localhost:5001/api/ebay-search", {
         cardName,
         cardSetNumber,
       });
 
-      console.log("eBay API Response:", response.data);
       setEbayResults(response.data);
       setEbaySearchCompleted(true);
     } catch (error) {
       console.error("Error fetching eBay results:", error);
       alert("Failed to fetch eBay results.");
     } finally {
-      setEbayLoading(false); // Stop eBay loading state
+      setEbayLoading(false);
     }
   };
 
@@ -163,32 +159,31 @@ function Scanner() {
         </div>
 
         <div style={{ marginTop: "20px" }}>
-    <h3>Or, use your webcam to take a pictuire of your card.</h3>
-    <WebcamComponent 
-      onCapture={(capturedFile) => {
-        setFile(capturedFile);
-        setFileUploaded(true);
-        setScanCompleted(false);
-        setOcrResult("");
-        setCardName("");
-        setCardSetNumber("");
-        setEbayResults([]);
-        setEbaySearchCompleted(false);
-      }} 
-    />
-  </div>
-
-  
+          <h3>Or, use your webcam to take a picture of your card.</h3>
+          <WebcamComponent 
+            onCapture={(capturedFile) => {
+              setFile(capturedFile);
+              setFileUploaded(true);
+              setScanCompleted(false);
+              setOcrResult("");
+              setCardName("");
+              setCardSetNumber("");
+              setEbayResults([]);
+              setEbaySearchCompleted(false);
+            }} 
+          />
+        </div>
 
         {file && (
           <div style={{ marginTop: "10px" }}>
             <img
               src={URL.createObjectURL(file)}
-              alt="Uploaded File Preview"
+              alt="Preview"
               style={{ width: "200px", border: "1px solid #ccc" }}
             />
           </div>
         )}
+
         <button
           onClick={handleScan}
           className={`button ${scanLoading ? "loading" : ""}`}
@@ -197,7 +192,6 @@ function Scanner() {
           {scanLoading ? "Scanning..." : "Scan"}
         </button>
 
-        {/* Pikachu-run GIF while scanning */}
         {scanLoading && (
           <div style={{ marginTop: "20px", textAlign: "center" }}>
             <img
@@ -248,7 +242,7 @@ function Scanner() {
               ebayResults.map((item, index) => (
                 <li key={index} style={{ margin: '10px 0' }}>
                   <a
-                    href={item.url}  // Changed from viewItemURL to url
+                    href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
