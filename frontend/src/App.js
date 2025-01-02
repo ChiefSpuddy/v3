@@ -1,10 +1,26 @@
-// Full App.js with eBay Search Integration
+// Full App.js with eBay Search Integration and Routing
 
 import React, { useState } from "react";
+import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
 import axios from "axios";
 import "./App.css";
+import Navbar from './Components/Navbar';
 
-function App() {
+// Home Component
+function Home() {
+  return (
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+      <h1>Welcome to the Card Scanning App</h1>
+      <p>Use this app to scan and manage your Pokémon card collection.</p>
+      <Link to="/scanner">
+        <button className="button">Go to Card Scanner</button>
+      </Link>
+    </div>
+  );
+}
+
+// Scanner Component
+function Scanner() {
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
   const [cardName, setCardName] = useState(""); // Track the card name
@@ -135,8 +151,10 @@ function App() {
       setLoading(false);
     }
   };
-  
+
   const handleEbaySearch = async () => {
+    console.log("Card Name:", cardName);
+    console.log("Card Set Number:", cardSetNumber);
     if (!cardName || !cardSetNumber) {
       alert("Please scan a card to get the card name and set number first.");
       return;
@@ -149,6 +167,7 @@ function App() {
         cardSetNumber,
       });
   
+      console.log("eBay Results:", response.data);
       setEbayResults(response.data);
     } catch (error) {
       console.error("Error fetching eBay results:", error);
@@ -157,7 +176,6 @@ function App() {
       setLoading(false);
     }
   };
-  
   
 
   return (
@@ -222,13 +240,12 @@ function App() {
   {ebayResults.length > 0 ? (
     ebayResults.map((item, index) => (
       <li key={index}>
-        {/* Display eBay item details with correct link */}
         <a
-          href={item.viewItemURL || "#"}  // Use the eBay URL
+          href={item.viewItemURL || "#"}
           target="_blank"
           rel="noopener noreferrer"
         >
-          {item.title} - ${item.price} {/* Display title and price */}
+          {item.title} - ${item.price}
         </a>
       </li>
     ))
@@ -241,4 +258,17 @@ function App() {
   );
 }
 
-export default App;
+// Main App Wrapper
+function AppWrapper() {
+  return (
+    <Router>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/scanner" element={<Scanner />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default AppWrapper;
