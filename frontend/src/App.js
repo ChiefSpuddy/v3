@@ -261,6 +261,7 @@ function Scanner() {
   const [showManualSearch, setShowManualSearch] = useState(false);
   const [ebayError, setEbayError] = useState(null);
   const [cardDetails, setCardDetails] = useState(null);
+  const [cardInfo, setCardInfo] = useState(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -354,34 +355,36 @@ const handleScan = async () => {
           setEbayResults(ebayResponse.data);
           setEbaySearchCompleted(true);
           
-          if (ebayResponse.data.length === 0) {
+          if (ebayResponse.data.length > 0) {
+            // Extract card info from successful automated scan
+            const info = extractCardInfoFromListings(ebayResponse.data);
+            setCardInfo(info);
+          } else {
             console.log("No eBay listings found for:", searchParams);
             handleNoResults();
-          }
-        } else if (ebayResponse.data?.error) {
-          console.error("eBay API Error:", ebayResponse.data.error);
-          setShowManualInput(true);
-          if (ebayResponse.data.error.includes('401')) {
-            console.error("Authorization failed - check API token");
+            setShowManualSearch(true); // Add this line
           }
         } else {
-          console.error("Invalid response format:", ebayResponse.data);
-          setShowManualInput(true);
+          setEbayError('Invalid response from eBay search');
+          setShowManualSearch(true); // Add this line
         }
       } catch (error) {
-        console.error("eBay search failed:", {
-          message: error.message,
-          status: error.response?.status,
-          data: error.response?.data
-        });
-        setShowManualInput(true);
+        console.error("eBay search failed:", error);
+        setShowManualSearch(true);
+        // Don't show error message for invalid response
+        if (error.message !== 'Invalid response from eBay search') {
+          setEbayError(error.message || 'Failed to search eBay');
+        }
       } finally {
         setEbayLoading(false);
       }
+    } else {
+      setShowManualSearch(true); // Add this line for when name is "Not Detected"
     }
   } catch (error) {
     console.error("OCR scan failed:", error);
     alert("Failed to scan card image.");
+    setShowManualSearch(true); // Add this line for OCR failures
   } finally {
     setScanLoading(false);
   }
@@ -424,11 +427,14 @@ const handleManualSearch = async (searchData) => {
       setEbaySearchCompleted(true);
       
       if (results.length > 0) {
-        // Hide manual search when we have results
+        // Extract card info from all listings
+        const info = extractCardInfoFromListings(results);
+        setCardInfo(info);
         setShowManualInput(false);
         setShowManualSearch(false);
         setEbayError(null);
       } else {
+        setCardInfo(null);
         setEbayError('No listings found for this card');
       }
     } else {
@@ -438,9 +444,27 @@ const handleManualSearch = async (searchData) => {
     console.error("Manual search failed:", error);
     setEbayError(error.message || 'Failed to search eBay');
     setEbayResults([]);
+    setCardInfo(null);
   } finally {
     setEbayLoading(false);
   }
+};
+
+// Helper functions for price calculations
+const calculateAveragePrice = (results) => {
+  if (!results.length) return 0;
+  const total = results.reduce((sum, item) => sum + parseFloat(item.price.replace(/[^0-9.]/g, '')), 0);
+  return (total / results.length).toFixed(2);
+};
+
+const findLowestPrice = (results) => {
+  if (!results.length) return 0;
+  return Math.min(...results.map(item => parseFloat(item.price.replace(/[^0-9.]/g, '')))).toFixed(2);
+};
+
+const findHighestPrice = (results) => {
+  if (!results.length) return 0;
+  return Math.max(...results.map(item => parseFloat(item.price.replace(/[^0-9.]/g, '')))).toFixed(2);
 };
 
 const handleNoResults = () => {
@@ -448,6 +472,48 @@ const handleNoResults = () => {
   // Pre-populate with scanned data
   setManualCardName(cardName);
   setManualSetNumber(cardSetNumber);
+};
+
+// Add helper functions to parse eBay listings
+const extractCardInfoFromListings = (listings) => {
+  if (!listings || listings.length === 0) return null;
+
+  // Analyze all titles to find common patterns
+  const setInfo = listings.reduce((info, listing) => {
+    const title = listing.title.toLowerCase();
+    const price = parseFloat(listing.price.replace(/[^0-9.]/g, ''));
+
+    // Try to extract set name (usually in parentheses or after "Pokemon")
+    const setMatch = title.match(/\b(?:pokemon\s+)?(.*?)\s+(?:set|tcg|trading card game)/i) ||
+                    title.match(/\((.*?)\)/);
+    if (setMatch && setMatch[1]) {
+      info.setNames.add(setMatch[1].trim());
+    }
+
+    // Add price for calculations
+    info.prices.push(price);
+
+    return info;
+  }, { setNames: new Set(), prices: [] });
+
+  // Calculate statistics
+  const prices = setInfo.prices;
+  const avgPrice = (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2);
+  const minPrice = Math.min(...prices).toFixed(2);
+  const maxPrice = Math.max(...prices).toFixed(2);
+
+  // Get most common set name
+  const setName = Array.from(setInfo.setNames)[0] || 'Unknown Set';
+
+  return {
+    setName: setName.charAt(0).toUpperCase() + setName.slice(1),
+    cardNumber: cardSetNumber || 'Unknown',
+    releaseYear: new Date().getFullYear(), // Default to current year if not found
+    averagePrice: avgPrice,
+    lowestPrice: minPrice,
+    highestPrice: maxPrice,
+    listingCount: listings.length
+  };
 };
 
   return (
@@ -504,51 +570,61 @@ const handleNoResults = () => {
           </>
         )}
 
-{ebayError && (
-      <div className="error-container">
-        <p className="error-message">{ebayError}</p>
-        <button 
-          onClick={() => setShowManualSearch(true)}
-          className="manual-search-trigger"
-        >
-          Try Manual Search
-        </button>
-        
-        {showManualSearch && (
-          <div className="manual-search-container">
-            <input
-              type="text"
-              placeholder="Enter card name"
-              value={manualCardName}
-              onChange={(e) => setManualCardName(e.target.value)}
-              className="manual-input"
-            />
-            <input
-              type="text"
-              placeholder="Enter set number"
-              value={manualSetNumber}
-              onChange={(e) => setManualSetNumber(e.target.value)}
-              className="manual-input"
-            />
-            <button
-              onClick={handleManualSearch}
-              disabled={!manualCardName.trim() && !manualSetNumber.trim()}
-              className="manual-search-button"
-            >
-              Search Again
-            </button>
-          </div>
-        )}
-      </div>
-    )}
+{ebayError && ebayError !== 'Invalid response from eBay search' && (
+  <div className="error-container">
+    <p className="error-message">{ebayError}</p>
+  </div>
+)}
 
-      {(ebaySearchCompleted || ebayLoading) && (
-        <section className="ebay-results-section">
-          {ebayLoading ? (
-            <p>Searching eBay...</p>
-          ) : (
-            <>
-              {Array.isArray(ebayResults) && ebayResults.length > 0 ? (
+      {/* Market Information Section - Moved Above Results */}
+      {cardInfo && ebayResults.length > 0 && (
+        <div className="card-info-section">
+          <h3>Market Information</h3>
+          <div className="card-info-grid">
+            <div className="info-item">
+              <span className="info-label">Set:</span>
+              <span className="info-value">{cardInfo.setName}</span>
+            </div>
+            <div className="info-item">
+              <span className="info-label">Card Number:</span>
+              <span className="info-value">{cardInfo.cardNumber}</span>
+            </div>
+            <div className="info-item">
+              <span className="info-label">Number of Listings:</span>
+              <span className="info-value">{cardInfo.listingCount}</span>
+            </div>
+            <div className="info-item">
+              <span className="info-label">Average Price:</span>
+              <span className="info-value">${cardInfo.averagePrice}</span>
+            </div>
+            <div className="info-item">
+              <span className="info-label">Price Range:</span>
+              <span className="info-value">${cardInfo.lowestPrice} - ${cardInfo.highestPrice}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+{(ebaySearchCompleted || ebayLoading) && (
+  <section className="ebay-results-section">
+    {ebayLoading ? (
+      <p>Searching eBay...</p>
+    ) : (
+      <>
+        {Array.isArray(ebayResults) && ebayResults.length > 0 ? (
+          <>
+            <h3 className="ebay-listings-header">eBay Listings</h3>
+            <div className="ebay-results-container">
+              <button 
+                className="scroll-button left" 
+                onClick={() => {
+                  const slider = document.querySelector('.ebay-results-slider');
+                  slider.scrollLeft -= 315; // Width + margin
+                }}
+              >
+                &#10094;
+              </button>
+              <div className="ebay-results-slider">
                 <ul className="ebay-results-list">
                   {ebayResults.map((item, index) => (
                     <li key={index}>
@@ -561,37 +637,27 @@ const handleNoResults = () => {
                     </li>
                   ))}
                 </ul>
-              ) : (
-                ebaySearchCompleted && <p>No eBay results found.</p>
-              )}
+              </div>
+              <button 
+                className="scroll-button right" 
+                onClick={() => {
+                  const slider = document.querySelector('.ebay-results-slider');
+                  slider.scrollLeft += 315; // Width + margin
+                }}
+              >
+                &#10095;
+              </button>
+            </div>
+          </>
+        ) : (
+          ebaySearchCompleted && <p>No eBay results found.</p>
+        )}
+      </>
+    )}
+  </section>
+)}
 
-              {ebaySearchCompleted && ebayResults.length === 0 && showManualInput && (
-                <div className="manual-input-container">
-                  <p>Try entering the set number manually:</p>
-                  <div className="manual-input-wrapper">
-                    <input
-                      type="text"
-                      value={manualSetNumber}
-                      onChange={(e) => setManualSetNumber(e.target.value)}
-                      placeholder="Enter set number (e.g. 061/064)"
-                      className="manual-input"
-                    />
-                    <button 
-                      onClick={handleManualSearch}
-                      disabled={!manualSetNumber.trim() || ebayLoading}
-                      className="manual-search-button"
-                    >
-                      Search Again
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-        {(showManualInput || ebayError) && ebayResults.length === 0 && (
+        {(showManualInput || ebayError || showManualSearch) && ebayResults.length === 0 && (
           <div className="manual-search-wrapper">
             <h3>No eBay results found. Try adjusting the card details:</h3>
             <ManualSearch
@@ -599,7 +665,7 @@ const handleNoResults = () => {
               initialSetNumber={cardSetNumber}
               onSearch={handleManualSearch}
               className="manual-search-below-preview"
-              error={ebayError}
+              error={ebayError !== 'Invalid response from eBay search' ? ebayError : null}
             />
           </div>
         )}
@@ -614,10 +680,12 @@ function AppWrapper() {
   return (
     <Router>
       <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/scanner" element={<Scanner />} />
-      </Routes>
+      <div className="content-wrapper">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/scanner" element={<Scanner />} />
+        </Routes>
+      </div>
     </Router>
   );
 }
