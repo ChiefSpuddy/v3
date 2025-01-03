@@ -25,6 +25,36 @@ const exclusions = [
   "aura star", "power", "poweril", "vstar power",
 ];
 
+// Add new constants for name filtering
+const nameExclusions = [
+  'psa', 'cgc', 'bgs', 'gem', 'mint', 'nm', 'near mint',
+  'holo', 'reverse', 'foil', 'stamped', 'card', 'pokemon',
+  'tcg', 'regular', 'non-holo', 'japanese', 'english',
+  'swsh', 'sv', 'base set', 'playable', 'grade', 'graded',
+  'trick or treat', 'trick', 'treat', 'cosmo', 'cosmos',
+  'rare', 'ultra rare', 'secret rare', 'promo', 
+  'twilight masquerade', 'bundle', 'booster',
+  '2024', '2023', '2022', '2021',  // Remove year patterns
+  'trick or trade', 'trick', 'trade', 'cosmo', 'cosmos',
+  'twilight', 'masquerade', 'bundle', 'booster', 'set',
+  'or', 'and', '&', 'series', 'coloring', 'colour',
+  'low pop', 'pop'
+];
+
+// Add set patterns mapping
+const setPatterns = {
+  '095/167': 'Twilight Masquerade',
+  'twilight masquerade': 'Twilight Masquerade',
+  '/167$': 'Twilight Masquerade',  // Cards ending in /167
+  'CRZ': 'Crown Zenith',
+  'PAL': 'Paldea Evolved',
+  'OBF': 'Obsidian Flames',
+  'MEW': '151',
+  'PAR': 'Paradox Rift',
+  'SHF': 'Shrouded Fable',
+  'SVI': 'Scarlet & Violet'
+};
+
 // Helper Functions - Move these outside of any component
 const cleanText = (text) => {
   return text
@@ -243,7 +273,7 @@ const extractSetNumberFromOCR = (ocrText) => {
 };
 
 // Scanner Component
-function Scanner() {
+const Scanner = () => {
   // Combine all state declarations
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
@@ -476,66 +506,230 @@ const handleNoResults = () => {
 };
 
 // Add helper functions to parse eBay listings
+const getSetFromCardNumber = (cardNumber) => {
+  if (!cardNumber || cardNumber === "Not Detected") return null;
+
+  // Add specific card number patterns
+  const setPatterns = {
+    '/165$': '151',  // If total is 165, it's from 151 set
+    '/064$': 'Shrouded Fable',  // If total is 064, it's from Shrouded Fable
+    'CRZ': 'Crown Zenith',
+    'PAL': 'Paldea Evolved',
+    'OBF': 'Obsidian Flames',
+    'MEW': '151',
+    'PAR': 'Paradox Rift',
+    'SHF': 'Shrouded Fable',
+    'SVI': 'Scarlet & Violet'
+  };
+
+  // Check for total card count patterns first
+  for (const [pattern, setName] of Object.entries(setPatterns)) {
+    if (pattern.startsWith('/') && cardNumber.match(pattern)) {
+      return setName;
+    }
+  }
+
+  // Then check for prefix patterns
+  for (const [prefix, setName] of Object.entries(setPatterns)) {
+    if (!prefix.startsWith('/') && cardNumber.startsWith(prefix)) {
+      return setName;
+    }
+  }
+
+  return null;
+};
+
+const findSetNameInTitle = (title, cardSetNames) => {
+  const normalizedTitle = title.toLowerCase().trim();
+  
+  // Add specific set name variations with priorities
+  const setVariations = {
+    'shrouded fable': 'Shrouded Fable',
+    'surgingsparks': 'Surging Sparks',
+    'surging sparks': 'Surging Sparks',
+    'sv08': 'Surging Sparks'
+  };
+
+  // First check for exact set name matches from variations
+  for (const [variation, setName] of Object.entries(setVariations)) {
+    if (normalizedTitle.includes(variation)) {
+      return setName;
+    }
+  }
+
+  // Try to match from card number pattern
+  const setFromNumber = getSetFromCardNumber(cardSetNumber);
+  if (setFromNumber) {
+    return setFromNumber;
+  }
+
+  // Skip series names that are too general
+  const seriesToSkip = [
+    'sword & shield',
+    'sun & moon',
+    'xy',
+    'black & white',
+    'diamond & pearl'
+  ];
+
+  // Try exact matches from CardSetNames.json
+  const exactMatch = cardSetNames.find(setName => {
+    const normalizedSetName = setName.toLowerCase();
+    return normalizedTitle.includes(normalizedSetName) && 
+           !seriesToSkip.includes(normalizedSetName);
+  });
+
+  if (exactMatch) return exactMatch;
+
+  // Try partial matches with common variations
+  const setMatch = cardSetNames.find(setName => {
+    if (seriesToSkip.includes(setName.toLowerCase())) return false;
+
+    const setVariations = [
+      setName.toLowerCase().replace(/&/g, 'and'),
+      setName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      setName.toLowerCase().split(' ').join(''),
+      setName.toLowerCase().replace(/\s+/g, '')
+    ];
+    return setVariations.some(variation => normalizedTitle.includes(variation));
+  });
+
+  return setMatch || 'Unknown Set';
+};
+
+const findCardNumber = (title) => {
+  // Match patterns like "163/182" with optional prefix like "Sv04:"
+  const patterns = [
+    /(\d{1,3}\/\d{1,3})\s+(?:Sv\d+:|[A-Za-z\s]+)/i,  // Matches "163/182 Sv04:"
+    /(\d{1,3}\/\d{1,3})/,  // Simple XXX/XXX pattern
+    /\b(\d{1,3})[\/\\](\d{1,3})\b/  // Fallback pattern
+  ];
+
+  for (const pattern of patterns) {
+    const match = title.match(pattern);
+    if (match) {
+      // If it's a split pattern, format it properly
+      if (match[2]) {
+        return `${match[1].padStart(3, '0')}/${match[2].padStart(3, '0')}`;
+      }
+      // Otherwise return the full match
+      return match[1];
+    }
+  }
+
+  return null;
+};
+
+// Add helper function to clean card names
+const cleanCardName = (name) => {
+  if (!name) return '';
+  
+  // Convert to lower case for comparison
+  let cleaned = name.toLowerCase();
+  
+  // Remove grading terms and scores
+  cleaned = cleaned.replace(/psa\s*\d+/gi, '');
+  cleaned = cleaned.replace(/cgc\s*\d+/gi, '');
+  cleaned = cleaned.replace(/bgs\s*\d+/gi, '');
+  cleaned = cleaned.replace(/pop\s*\d+/gi, '');
+  
+  // Remove year patterns
+  cleaned = cleaned.replace(/\b20\d{2}\b/g, '');
+  
+  // Remove "Trick or Trade" and related terms
+  cleaned = cleaned.replace(/trick\s*(?:or|&)?\s*treat(?:s|ing)?/gi, '');
+  
+  // Remove all exclusion words
+  nameExclusions.forEach(term => {
+    cleaned = cleaned.replace(new RegExp(`\\b${term}\\b`, 'gi'), '');
+  });
+  
+  // Clean up extra spaces and punctuation
+  cleaned = cleaned
+    .replace(/[^\w\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Capitalize first letter of each word
+  return cleaned
+    .split(' ')
+    .filter(word => word.length > 0)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Update the card name extraction in extractCardInfoFromListings
 const extractCardInfoFromListings = (listings) => {
   if (!listings || listings.length === 0) return null;
 
-  // Function to find matching set name from our known sets
-  const findSetName = (title) => {
-    return cardSetNames.find(setName => 
-      title.toLowerCase().includes(setName.toLowerCase())
-    );
-  };
-
-  // Function to extract card number from title or original scan
-  const findCardNumber = (title, originalNumber) => {
-    // Try to find XXX/XXX pattern in title
-    const numberMatch = title.match(/(\d{1,3})[/\\](\d{1,3})/);
-    if (numberMatch) return `${numberMatch[1]}/${numberMatch[2]}`;
-    
-    // If no match in title, use original number if valid
-    if (originalNumber && originalNumber !== "Not Detected") {
-      return originalNumber;
+  // Try to extract card name from listings
+  const namePattern = /^(.*?)(?:\d{1,3}\/\d{1,3}|sv\d+)/i;
+  const cardNames = new Map(); // Use Map to track frequency
+  
+  listings.forEach(listing => {
+    const match = listing.title.match(namePattern);
+    if (match) {
+      const cleanName = cleanCardName(match[1]);
+      if (cleanName.length > 2) {
+        cardNames.set(cleanName, (cardNames.get(cleanName) || 0) + 1);
+      }
     }
-    
-    return "Unknown";
-  };
+  });
 
+  // Get most common clean name
+  let mostCommonName = '';
+  let highestFreq = 0;
+  
+  cardNames.forEach((freq, name) => {
+    if (freq > highestFreq) {
+      highestFreq = freq;
+      mostCommonName = name;
+    }
+  });
+
+  // Rest of existing tracking logic
+  const cardNumberFrequency = new Map();
   const setInfo = listings.reduce((info, listing) => {
-    const title = listing.title.toLowerCase();
+    const title = listing.title;
     const price = parseFloat(listing.price.replace(/[^0-9.]/g, ''));
     
-    // Try to find set name in this listing
-    const setName = findSetName(title);
-    if (setName) {
+    // Find set name and card number
+    const setName = findSetNameInTitle(title, cardSetNames);
+    if (setName !== 'Unknown Set') {
       info.setNames.add(setName);
     }
 
-    // Try to find card number in this listing
-    const cardNum = findCardNumber(title, cardSetNumber);
-    if (cardNum !== "Unknown") {
-      info.cardNumbers.add(cardNum);
+    const cardNum = findCardNumber(title);
+    if (cardNum) {
+      cardNumberFrequency.set(cardNum, (cardNumberFrequency.get(cardNum) || 0) + 1);
     }
 
     info.prices.push(price);
     return info;
   }, { 
-    setNames: new Set(), 
-    cardNumbers: new Set(), 
+    setNames: new Set(),
     prices: [] 
   });
 
-  // Get most common set name, or use first one found
-  const setName = Array.from(setInfo.setNames)[0] || 'Unknown Set';
+  // Get most common card number
+  let mostCommonCardNumber = null;
+  let highestFrequency = 0;
   
-  // Get card number (prefer scanned number if available)
-  const finalCardNumber = cardSetNumber !== "Not Detected" 
-    ? cardSetNumber 
-    : Array.from(setInfo.cardNumbers)[0] || "Unknown";
+  cardNumberFrequency.forEach((frequency, cardNum) => {
+    if (frequency > highestFrequency) {
+      highestFrequency = frequency;
+      mostCommonCardNumber = cardNum;
+    }
+  });
+
+  // Get final card name (prefer name from listings over scanned name)
+  const finalCardName = mostCommonName || cleanCardName(cardName);
 
   const prices = setInfo.prices.filter(price => price > 0);
   return {
-    setName: setName,
-    cardNumber: finalCardNumber,
+    cardName: finalCardName,
+    setName: Array.from(setInfo.setNames)[0] || 'Unknown Set',
+    cardNumber: mostCommonCardNumber || cardSetNumber || "Unknown",
     listingCount: listings.length,
     averagePrice: (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2),
     lowestPrice: Math.min(...prices).toFixed(2),
@@ -543,59 +737,61 @@ const extractCardInfoFromListings = (listings) => {
   };
 };
 
-  return (
-    <div className="app-container">
-      <h1>Card Scanner & eBay Search</h1>
+// Update the render section to remove scanned details when market info is shown
+return (
+  <div className="app-container">
+    <h1>Card Scanner & eBay Search</h1>
 
-      <section>
-        <h2>Card Scanner</h2>
-        <div className="file-input-container">
-          <label className="file-label">
-            {scanCompleted ? "Upload Another Card" : "Choose File"}
-            <input
-              type="file"
-              className="file-input-hidden"
-              onChange={handleFileChange}
-              accept="image/*"
-            />
-          </label>
+    <section>
+      <h2>Card Scanner</h2>
+      <div className="file-input-container">
+        <label className="file-label">
+          {scanCompleted ? "Upload Another Card" : "Choose File"}
+          <input
+            type="file"
+            className="file-input-hidden"
+            onChange={handleFileChange}
+            accept="image/*"
+          />
+        </label>
+      </div>
+
+      {imagePreview && (
+        <div className="image-preview-container">
+          <img 
+            src={imagePreview} 
+            alt="Preview" 
+            className="image-preview"
+          />
         </div>
+      )}
 
-        {imagePreview && (
-          <div className="image-preview-container">
-            <img 
-              src={imagePreview} 
-              alt="Preview" 
-              className="image-preview"
-            />
-          </div>
-        )}
+      {fileUploaded && (
+        <div className="scan-button-container">
+          <button 
+            onClick={handleScan}
+            disabled={scanLoading}
+            className="scan-button"
+          >
+            {scanLoading ? (
+              <>
+                <img src={pikachuRun} alt="Loading..." className="loading-gif" />
+                Scanning...
+              </>
+            ) : (
+              "Scan Card"
+            )}
+          </button>
+        </div>
+      )}
 
-        {fileUploaded && (
-          <div className="scan-button-container">
-            <button 
-              onClick={handleScan}
-              disabled={scanLoading}
-              className="scan-button"
-            >
-              {scanLoading ? (
-                <>
-                  <img src={pikachuRun} alt="Loading..." className="loading-gif" />
-                  Scanning...
-                </>
-              ) : (
-                "Scan Card"
-              )}
-            </button>
-          </div>
-        )}
-
-        {scanCompleted && (
-          <>
-            <p><strong>Card Name:</strong> {cardName}</p>
-            <p><strong>Card Set Number:</strong> {cardSetNumber}</p>
-          </>
-        )}
+      {/* Only show scanned details if no market info yet */}
+      {scanCompleted && !cardInfo && !ebayResults.length > 0 && (
+        <>
+          <p><strong>Card Name:</strong> {cardName}</p>
+          <p><strong>Card Set Number:</strong> {cardSetNumber}</p>
+        </>
+      )}
 
 {ebayError && ebayError !== 'Invalid response from eBay search' && (
   <div className="error-container">
@@ -608,6 +804,10 @@ const extractCardInfoFromListings = (listings) => {
         <div className="card-info-section">
           <h3>Market Information</h3>
           <div className="card-info-grid">
+            <div className="info-item">
+              <span className="info-label">Card Name:</span>
+              <span className="info-value">{cardInfo.cardName}</span>
+            </div>
             <div className="info-item">
               <span className="info-label">Set:</span>
               <span className="info-value">{cardInfo.setName}</span>
@@ -642,38 +842,18 @@ const extractCardInfoFromListings = (listings) => {
           <>
             <h3 className="ebay-listings-header">eBay Listings</h3>
             <div className="ebay-results-container">
-              <button 
-                className="scroll-button left" 
-                onClick={() => {
-                  const slider = document.querySelector('.ebay-results-slider');
-                  slider.scrollLeft -= 315; // Width + margin
-                }}
-              >
-                &#10094;
-              </button>
-              <div className="ebay-results-slider">
-                <ul className="ebay-results-list">
-                  {ebayResults.map((item, index) => (
-                    <li key={index}>
-                      <a href={item.url} target="_blank" rel="noopener noreferrer">
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{item.title}</span>
-                          <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button 
-                className="scroll-button right" 
-                onClick={() => {
-                  const slider = document.querySelector('.ebay-results-slider');
-                  slider.scrollLeft += 315; // Width + margin
-                }}
-              >
-                &#10095;
-              </button>
+              <ul className="ebay-results-list">
+                {ebayResults.map((item, index) => (
+                  <li key={index} className="ebay-result-item">
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                      <div className="ebay-listing-content">
+                        <span className="listing-title">{item.title}</span>
+                        <span className="listing-price">${item.price}</span>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
           </>
         ) : (
@@ -684,26 +864,26 @@ const extractCardInfoFromListings = (listings) => {
   </section>
 )}
 
-        {(showManualInput || ebayError || showManualSearch) && ebayResults.length === 0 && (
-          <div className="manual-search-wrapper">
-            <h3>No eBay results found. Try adjusting the card details:</h3>
-            <ManualSearch
-              initialCardName={cardName}
-              initialSetNumber={cardSetNumber}
-              onSearch={handleManualSearch}
-              className="manual-search-below-preview"
-              error={ebayError !== 'Invalid response from eBay search' ? ebayError : null}
-            />
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
+      {(showManualInput || ebayError || showManualSearch) && ebayResults.length === 0 && (
+        <div className="manual-search-wrapper">
+          <h3>No eBay results found. Try adjusting the card details:</h3>
+          <ManualSearch
+            initialCardName={cardName}
+            initialSetNumber={cardSetNumber}
+            onSearch={handleManualSearch}
+            className="manual-search-below-preview"
+            error={ebayError !== 'Invalid response from eBay search' ? ebayError : null}
+          />
+        </div>
+      )}
+    </section>
+  </div>
+);
+};
 
 // Remove App component since its functionality is merged into Scanner
 
-function AppWrapper() {
+const AppWrapper = () => {
   return (
     <Router>
       <Navbar />
@@ -715,7 +895,7 @@ function AppWrapper() {
       </div>
     </Router>
   );
-}
+};
 
 // Export at top level
 export default AppWrapper;
