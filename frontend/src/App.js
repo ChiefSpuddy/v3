@@ -26,66 +26,136 @@ function Scanner() {
   const correctMisreads = (text) => {
     return text
       .replace(/([a-zA-Z])eX\b/gi, "$1 EX")
-      .replace(/\bex\b/gi, " EX");
+      .replace(/\bex\b/gi, " EX")
+      .replace(/\bSTAGG\b/gi, "Stage")
+      .replace(/['']/g, "'")
+      .replace(/\bvessel\b/gi, "Vessel");
   };
-
+  
   const extractCardNameFromOCR = (ocrText) => {
-    const segments = ocrText.split(",");
-    const stopwords = [
-      "TRAINER", "ITEM", "STAGE", "ABILITY", "ATTACK", "DAMAGE", "WEAKNESS", "RESISTANCE", "CD", "HP", "BASIC",
+    const segments = ocrText.split(/[,.-]/);
+    const specialTypes = ["EX", "GX", "V", "VMAX", "VSTAR"];
+    const exclusions = [
+      "hp", "basic", "stage", "item", "use", "this", "card", "basc", 
+      "your", "from", "energy", "damage", "more", "each", "utem",
+      "when", "than", "the", "put", "into", "discard", "pile", "iten",
+      "attack", "effect", "during", "turn", "weakness", "resistance",
+      "trainer", "ability", "pokemon", "evolves", "retreat", "splash",
+      "deck", "hand", "active", "bench", "prize", "cards", "typhoon",
+      "basis", "basig", "stagg", "power", "move", "type", "pte", "fte",
+      "uaa", "max", "star", "use", "card", "put", "into", "lten"
     ];
-
+  
+    const cleanText = (text) => {
+      return text
+        .replace(/[@\[\]{}\\\/\(\)]/g, ' ')  // Remove special chars
+        .replace(/\d+/g, ' ')                // Remove numbers
+        .replace(/[^a-zA-Z\s]/g, ' ')        // Keep only letters and spaces
+        .replace(/\s+/g, ' ')                // Normalize spaces
+        .trim();
+    };
+  
     for (const segment of segments) {
-      let trimmedSegment = segment.trim().replace(/[^A-Za-z\s]/g, "");
-
-      if (
-        trimmedSegment.length > 1 &&
-        /^[A-Za-z\s]+$/.test(trimmedSegment) &&
-        !exclusions.includes(trimmedSegment.toLowerCase()) &&
-        !stopwords.includes(trimmedSegment.toUpperCase())
-      ) {
-        const words = trimmedSegment.split(" ");
-
-        if (words.length > 1 && /^[A-Z]/.test(words[0]) && /^[A-Z]/.test(words[1])) {
-          return `${words[0]} ${words[1]}`;
+      const cleaned = cleanText(segment);
+      const words = cleaned.split(' ')
+        .filter(word => 
+          word.length >= 4 &&  // Minimum length check
+          !exclusions.includes(word.toLowerCase()) &&
+          /^[A-Z][a-z]{2,}$/.test(word)  // Proper case validation
+        );
+  
+      if (words.length > 0) {
+        // Try multi-word names
+        if (words.length >= 2) {
+          const twoWords = words.slice(0, 2).join(' ');
+          for (const type of specialTypes) {
+            if (new RegExp(`${twoWords}\\s*${type}`, 'i').test(cleaned)) {
+              return `${twoWords} ${type}`;
+            }
+          }
+          return twoWords;
         }
-
-        if (/^[A-Z]/.test(trimmedSegment)) {
-          return trimmedSegment;
+  
+        // Single word with special type
+        for (const type of specialTypes) {
+          if (new RegExp(`${words[0]}\\s*${type}`, 'i').test(cleaned)) {
+            return `${words[0]} ${type}`;
+          }
+        }
+  
+        // Single word must be longer than 4 chars
+        if (words[0].length >= 4) {
+          return words[0];
         }
       }
     }
-
+  
     return "Not Detected";
   };
 
-  const extractSetNumberFromOCR = (ocrText) => {
-    const matches = ocrText.match(/\b\d+\s?\/\s?\d+\b|\b\d{1,4}\b/g);
+const extractSetNumberFromOCR = (ocrText) => {
+  const cleanedText = ocrText
+    .replace(/[Il]/g, '1')
+    .replace(/[oO]/g, '0');
 
-    if (!matches) return "Not Detected";
-
-    const validMatches = matches.filter((num) => {
-      if (/^\d+\s?\/\s?\d+$/.test(num)) return true;
-      return !(num >= 2020 && num <= 2029);
-    });
-
-    const cleanedMatches = validMatches.map((num) => num.replace(/\s?\/\s?/g, "/"));
-
-    return cleanedMatches.length > 0 ? cleanedMatches[cleanedMatches.length - 1] : "Not Detected";
+  // Helper to correct first digit if it's 4 or 5
+  const correctFirstDigit = (num) => {
+    if (/^[456789]/.test(num)) {
+      return '1' + num.slice(1);
+    }
+    return num;
   };
 
-  const handleFileChange = (e) => {
-    // Clear any existing webcam captures
-    setFile(null); 
-    setFile(e.target.files[0]);
-    setFileUploaded(true);
-    setScanCompleted(false);
-    setOcrResult("");
-    setCardName("");
-    setCardSetNumber("");
-    setEbayResults([]);
-    setEbaySearchCompleted(false);
-  };
+  // First priority: Check for format with slash (flexible spacing)
+  const setMatch = cleanedText.match(/\b(\d{2,3})\s*[\/\\]\s*(\d{2,3})\b/);
+  if (setMatch) {
+    const [_, num1, num2] = setMatch;
+    const correctedNum1 = correctFirstDigit(num1);
+    const correctedNum2 = correctFirstDigit(num2);
+    return `${correctedNum1.padStart(3, '0')}/${correctedNum2.padStart(3, '0')}`;
+  }
+
+  // Second priority: Look for embedded numbers
+  const longNumberMatch = cleanedText.match(/\b(\d{6,7})\b/);
+  if (longNumberMatch) {
+    const num = longNumberMatch[1];
+    if (num.length >= 6) {
+      const first = correctFirstDigit(num.substring(0, 3));
+      const second = correctFirstDigit(num.substring(3, 6));
+      return `${first}/${second}`;
+    }
+  }
+
+  // Third priority: Check for promo numbers
+  const promoMatch = cleanedText.match(/\b(0\d{2})\b/);
+  if (promoMatch) {
+    return promoMatch[1];
+  }
+
+  // Last priority: Check for set codes
+  if (cleanedText.includes('SM') || cleanedText.includes('SV')) {
+    const codeMatch = cleanedText.match(/\b(\d{2,3})\b/);
+    if (codeMatch) {
+      const num = correctFirstDigit(codeMatch[1]);
+      return num.padStart(3, '0');
+    }
+  }
+
+  return "Not Detected";
+};
+
+const handleFileChange = (e) => {
+  // Clear any existing webcam captures
+  setFile(null); 
+  setFile(e.target.files[0]);
+  setFileUploaded(true);
+  setScanCompleted(false);
+  setOcrResult("");
+  setCardName("");
+  setCardSetNumber("");
+  setEbayResults([]);
+  setEbaySearchCompleted(false);
+};
 
   const handleScan = async () => {
     if (!file) {
