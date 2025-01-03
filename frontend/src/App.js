@@ -104,47 +104,47 @@ const extractCardNameFromOCR = (ocrText) => {
 };
 
 const extractSetNumberFromOCR = (ocrText) => {
+  console.log("Raw OCR Text:", ocrText);
+
   const cleanedText = ocrText
     .replace(/[Il]/g, '1')
     .replace(/[oO]/g, '0')
-    .replace(/(\d)\s+(\d)/g, '$1$2');
+    .replace(/[.,;]/g, ' ');
 
-  const correctFirstDigit = (num) => {
-    if (/^[456789]/.test(num)) {
-      return '1' + num.slice(1);
-    }
-    return num;
-  };
-
-  // First: Look for numbers near known card names
-  const cardNumberMatch = cleanedText.match(/(?:lucario|pikachu|charizard|mew).*?(\d{2,3})/i);
-  if (cardNumberMatch) {
-    const num = correctFirstDigit(cardNumberMatch[1]);
-    return num.padStart(3, '0');
-  }
-
-  // Second: Look for isolated 3-digit numbers
-  const nums = cleanedText.match(/\b(\d{2,3})\b/g) || [];
-  for (const num of nums) {
-    if (num >= 200 && num <= 300) {  // Common card number range
-      return correctFirstDigit(num).padStart(3, '0');
-    }
-  }
-
-  // Third: Check standard formats
+  // First: Look for XXX/XXX format - highest priority and keep both numbers
   const setMatch = cleanedText.match(/\b(\d{2,3})\s*[\/\\]\s*(\d{2,3})\b/);
   if (setMatch) {
     const [_, num1, num2] = setMatch;
-    const correctedNum1 = correctFirstDigit(num1);
-    return correctedNum1.padStart(3, '0');
+    return `${num1.padStart(3, '0')}/${num2.padStart(3, '0')}`;
   }
 
-  // Fourth: Check for set codes
-  if (cleanedText.match(/\b(SM|SV)\s*\d{2,3}\b/i)) {
-    const codeMatch = cleanedText.match(/\b(?:SM|SV)\s*(\d{2,3})\b/i);
-    if (codeMatch) {
-      return correctFirstDigit(codeMatch[1]).padStart(3, '0');
+  // Second: Look for 6-7 digit numbers to split
+  const longNumberMatch = cleanedText.match(/\b(\d{6,7})\b/);
+  if (longNumberMatch) {
+    const num = longNumberMatch[1];
+    if (num.length >= 6) {
+      const first = num.substring(0, 3);
+      const second = num.substring(3, 6);
+      return `${first}/${second}`;
     }
+  }
+
+  // Third: Check for SWSH/SM numbers
+  const swshMatch = cleanedText.match(/\b(?:SWSH|SM)\s*(\d{2,3})\b/i);
+  if (swshMatch) {
+    return swshMatch[1].padStart(3, '0');
+  }
+
+  // Fourth: Look for exact promo numbers (075)
+  const promoMatch = cleanedText.match(/\b0\s*7\s*5\b/);
+  if (promoMatch) {
+    return promoMatch[0].replace(/\s/g, '');
+  }
+
+  // Fifth: Look for standalone "050" style numbers
+  const standaloneMatch = cleanedText.match(/\b0\s*[45]\s*[0-9]\b/);
+  if (standaloneMatch) {
+    return standaloneMatch[0].replace(/\s/g, '');
   }
 
   return "Not Detected";
