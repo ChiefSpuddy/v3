@@ -29,7 +29,7 @@ section {
   background: rgba(255, 255, 255, 0.9);
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  max-width: 800px;  /* Increased from 600px */
+  max-width: 800px;
   width: 100%;
 }
 
@@ -44,10 +44,16 @@ button, .file-label {
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  margin: 5px;
 }
 
 button:hover, .file-label:hover {
   background-color: #0056b3;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 .file-label {
@@ -58,93 +64,107 @@ button:hover, .file-label:hover {
   display: none;
 }
 
-/* eBay results styles */
-.ebay-results {
-  max-width: 800px;  /* Increased from 600px */
-  margin: 30px auto;
-  padding: 20px;
-  background-color: #f8f9fa;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  text-align: left;
+/* Loading styles */
+.loading-gif {
+  width: 30px;
+  height: 30px;
+  margin-right: 10px;
+  vertical-align: middle;
 }
 
-.ebay-results ul {
+/* Scan button container styles */
+.scan-button-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.scan-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 150px;
+}
+
+/* eBay results styles */
+.ebay-results-section {
+  width: 100%;
+  margin: 20px 0;
+  padding: 15px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.ebay-results-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;  /* Reduced from 15px */
+  gap: 2px;
+  width: 100%;
 }
 
-.ebay-results li {
+.ebay-results-list li {
   margin: 0;
   padding: 0;
+  width: 100%;
 }
 
-.ebay-results a {
+.ebay-results-list a {
   color: #0066c0;
   text-decoration: none;
   display: block;
-  padding: 15px;
+  padding: 12px;
   border: 1px solid #ddd;
   border-radius: 8px;
   background-color: #ffffff;
   transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.ebay-results a:hover {
-  background-color: #f5f5f5;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  text-decoration: none;
-}
-
-/* General link styles */
-a {
-  pointer-events: auto;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-video {
-  border: 2px solid #ccc;
+/* Manual input styles */
+.manual-input-container {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8f9fa;
   border-radius: 8px;
-  margin-bottom: 10px;
 }
 
-button {
-  margin: 5px;
+.manual-input-wrapper {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
 }
 
-h3 {
-  margin: 20px 0 10px;
-  color: #333;
+.manual-input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 200px;
 }
 
+/* Webcam styles */
 .webcam-section {
   margin: 20px 0;
   padding: 20px;
   border-top: 1px solid #ddd;
 }
 
-.button {
-  margin: 5px;
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.button:hover {
-  background-color: #0056b3;
+.webcam-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 15px 0;
 }
 
 .webcam-device-select {
@@ -171,11 +191,24 @@ h3 {
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.webcam-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin: 15px 0;
+video {
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  max-width: 100%;
+  height: auto;
 }
 
+/* Image preview styles */
+.image-preview-container {
+  margin: 20px 0;
+  max-width: 200px;
+  margin: 20px auto;
+}
+
+.image-preview {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}

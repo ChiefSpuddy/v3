@@ -7,6 +7,149 @@ import WebcamComponent from './Components/WebcamComponent';
 import Navbar from './Components/Navbar';
 import pikachuRun from './Assets/pikachu-run.gif';
 
+// Constants
+const specialTypes = ["EX", "GX", "V STAR", "VSTAR", "V", "VMAX"];
+const specialPrefixes = ["Radiant"];
+const knownPokemon = [
+  "Mew", "Lucario", "Pikachu", "Charizard", "Mewtwo", 
+  "Magneton", "Ceruledge"
+];
+const exclusions = [
+  "hp", "basic", "stage", "item", "use", "this", "card",
+  "your", "from", "energy", "damage", "more", "each",
+  "when", "than", "the", "put", "into", "discard", "pile",
+  "attack", "effect", "during", "turn", "weakness", "resistance",
+  "restart", "ability", "move", "power", "fighting", "knuckle",
+  "thunder", "flame", "water", "psychic", "strike", "pulse"
+];
+
+// Helper Functions
+const cleanText = (text) => {
+  return text
+    .replace(/VSTAR/i, "V STAR")
+    .replace(/[@\[\]{}\\\/\(\)]/g, ' ')
+    .replace(/\d+/g, ' ')
+    .replace(/[^a-zA-Z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const correctMisreads = (text) => {
+  return text
+    .replace(/([a-zA-Z])eX\b/gi, "$1 EX")
+    .replace(/\bex\b/gi, " EX")
+    .replace(/\bSTAGG\b/gi, "Stage")
+    .replace(/['']/g, "'")
+    .replace(/\bvessel\b/gi, "Vessel");
+};
+
+const extractCardNameFromOCR = (ocrText) => {
+  const segments = ocrText.split(/[,.-]/);
+
+  for (const segment of segments) {
+    const cleaned = cleanText(segment);
+
+    // Check for Radiant prefix
+    for (const prefix of specialPrefixes) {
+      const radiantMatch = new RegExp(`${prefix}\\s+([A-Z][a-z]+)`, 'i');
+      const match = cleaned.match(radiantMatch);
+      if (match) return `${prefix} ${match[1]}`;
+    }
+    
+    // Check for known Pokémon with special types
+    for (const pokemon of knownPokemon) {
+      for (const type of specialTypes) {
+        const pattern = new RegExp(`${pokemon}.*?${type}|${type}.*?${pokemon}`, 'i');
+        if (pattern.test(cleaned)) {
+          return `${pokemon} ${type}`;
+        }
+      }
+      // Check for just the Pokémon name
+      if (cleaned.toLowerCase().includes(pokemon.toLowerCase())) {
+        return pokemon;
+      }
+    }
+
+    const words = cleaned.split(' ')
+      .filter(word => 
+        word.length >= 4 &&
+        !exclusions.includes(word.toLowerCase()) &&
+        /^[A-Z][a-z]{2,}$/.test(word)
+      );
+
+    if (words.length > 0) {
+      // Try multi-word names
+      if (words.length >= 2) {
+        const twoWords = words.slice(0, 2).join(' ');
+        for (const type of specialTypes) {
+          if (new RegExp(`${twoWords}\\s*${type}`, 'i').test(cleaned)) {
+            return `${twoWords} ${type}`;
+          }
+        }
+        return twoWords;
+      }
+
+      // Single word with special type
+      for (const type of specialTypes) {
+        if (new RegExp(`${words[0]}\\s*${type}`, 'i').test(cleaned)) {
+          return `${words[0]} ${type}`;
+        }
+      }
+
+      return words[0];
+    }
+  }
+
+  return "Not Detected";
+};
+
+const extractSetNumberFromOCR = (ocrText) => {
+  const cleanedText = ocrText
+    .replace(/[Il]/g, '1')
+    .replace(/[oO]/g, '0')
+    .replace(/(\d)\s+(\d)/g, '$1$2');
+
+  const correctFirstDigit = (num) => {
+    if (/^[456789]/.test(num)) {
+      return '1' + num.slice(1);
+    }
+    return num;
+  };
+
+  // First: Look for numbers near known card names
+  const cardNumberMatch = cleanedText.match(/(?:lucario|pikachu|charizard|mew).*?(\d{2,3})/i);
+  if (cardNumberMatch) {
+    const num = correctFirstDigit(cardNumberMatch[1]);
+    return num.padStart(3, '0');
+  }
+
+  // Second: Look for isolated 3-digit numbers
+  const nums = cleanedText.match(/\b(\d{2,3})\b/g) || [];
+  for (const num of nums) {
+    if (num >= 200 && num <= 300) {  // Common card number range
+      return correctFirstDigit(num).padStart(3, '0');
+    }
+  }
+
+  // Third: Check standard formats
+  const setMatch = cleanedText.match(/\b(\d{2,3})\s*[\/\\]\s*(\d{2,3})\b/);
+  if (setMatch) {
+    const [_, num1, num2] = setMatch;
+    const correctedNum1 = correctFirstDigit(num1);
+    return correctedNum1.padStart(3, '0');
+  }
+
+  // Fourth: Check for set codes
+  if (cleanedText.match(/\b(SM|SV)\s*\d{2,3}\b/i)) {
+    const codeMatch = cleanedText.match(/\b(?:SM|SV)\s*(\d{2,3})\b/i);
+    if (codeMatch) {
+      return correctFirstDigit(codeMatch[1]).padStart(3, '0');
+    }
+  }
+
+  return "Not Detected";
+};
+
 function Scanner() {
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
@@ -18,196 +161,109 @@ function Scanner() {
   const [fileUploaded, setFileUploaded] = useState(false);
   const [scanCompleted, setScanCompleted] = useState(false);
   const [ebaySearchCompleted, setEbaySearchCompleted] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualSetNumber, setManualSetNumber] = useState('');
+  const [imagePreview, setImagePreview] = useState(null);
 
-  const exclusions = [
-    "hp", "trainer", "basic", "item", "stage", "basc", "utem", "iten", "splash", "typhoon", "basis", "basig",
-  ];
-
-  const correctMisreads = (text) => {
-    return text
-      .replace(/([a-zA-Z])eX\b/gi, "$1 EX")
-      .replace(/\bex\b/gi, " EX")
-      .replace(/\bSTAGG\b/gi, "Stage")
-      .replace(/['']/g, "'")
-      .replace(/\bvessel\b/gi, "Vessel");
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFile(file);
+      setFileUploaded(true);
+      setScanCompleted(false);
+      setOcrResult("");
+      setCardName("");
+      setCardSetNumber("");
+      setEbayResults([]);
+      setEbaySearchCompleted(false);
+      setShowManualInput(false);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
   };
-  
-  const extractCardNameFromOCR = (ocrText) => {
-    const segments = ocrText.split(/[,.-]/);
-    const specialTypes = ["EX", "GX", "V", "VMAX", "VSTAR"];
-    const exclusions = [
-      "hp", "basic", "stage", "item", "use", "this", "card", "basc", 
-      "your", "from", "energy", "damage", "more", "each", "utem",
-      "when", "than", "the", "put", "into", "discard", "pile", "iten",
-      "attack", "effect", "during", "turn", "weakness", "resistance",
-      "trainer", "ability", "pokemon", "evolves", "retreat", "splash",
-      "deck", "hand", "active", "bench", "prize", "cards", "typhoon",
-      "basis", "basig", "stagg", "power", "move", "type", "pte", "fte",
-      "uaa", "max", "star", "use", "card", "put", "into", "lten"
-    ];
-  
-    const cleanText = (text) => {
-      return text
-        .replace(/[@\[\]{}\\\/\(\)]/g, ' ')  // Remove special chars
-        .replace(/\d+/g, ' ')                // Remove numbers
-        .replace(/[^a-zA-Z\s]/g, ' ')        // Keep only letters and spaces
-        .replace(/\s+/g, ' ')                // Normalize spaces
-        .trim();
-    };
-  
-    for (const segment of segments) {
-      const cleaned = cleanText(segment);
-      const words = cleaned.split(' ')
-        .filter(word => 
-          word.length >= 4 &&  // Minimum length check
-          !exclusions.includes(word.toLowerCase()) &&
-          /^[A-Z][a-z]{2,}$/.test(word)  // Proper case validation
-        );
-  
-      if (words.length > 0) {
-        // Try multi-word names
-        if (words.length >= 2) {
-          const twoWords = words.slice(0, 2).join(' ');
-          for (const type of specialTypes) {
-            if (new RegExp(`${twoWords}\\s*${type}`, 'i').test(cleaned)) {
-              return `${twoWords} ${type}`;
-            }
-          }
-          return twoWords;
+
+  // Add useEffect for cleanup
+React.useEffect(() => {
+  return () => {
+    // Clean up URL when component unmounts
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+  };
+}, [imagePreview]);
+
+const handleScan = async () => {
+  if (!file) {
+    alert("Please select a file first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  setScanLoading(true);
+  try {
+    const response = await axios.post("http://127.0.0.1:5001/ocr", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    let resultText = response.data.text.join(", ");
+    resultText = correctMisreads(resultText);
+    setOcrResult(resultText);
+
+    const name = extractCardNameFromOCR(resultText);
+    const setNumber = extractSetNumberFromOCR(resultText);
+
+    setCardName(name);
+    setCardSetNumber(setNumber);
+    setScanCompleted(true);
+
+    // Auto trigger eBay search
+    if (name !== "Not Detected") {
+      setEbayLoading(true);
+      try {
+        const ebayResponse = await axios.post("http://localhost:5001/api/ebay-search", {
+          cardName: name.trim(),
+          cardSetNumber: setNumber !== "Not Detected" ? setNumber.trim() : null,
+          searchType: 'exact'
+        });
+
+        setEbayResults(ebayResponse.data);
+        setEbaySearchCompleted(true);
+        
+        if (!ebayResponse.data || ebayResponse.data.length === 0) {
+          setShowManualInput(true);
         }
-  
-        // Single word with special type
-        for (const type of specialTypes) {
-          if (new RegExp(`${words[0]}\\s*${type}`, 'i').test(cleaned)) {
-            return `${words[0]} ${type}`;
-          }
-        }
-  
-        // Single word must be longer than 4 chars
-        if (words[0].length >= 4) {
-          return words[0];
-        }
+      } catch (error) {
+        console.error("Error searching eBay:", error?.response?.data || error);
+        setShowManualInput(true);
+      } finally {
+        setEbayLoading(false);
       }
     }
-  
-    return "Not Detected";
-  };
-
-const extractSetNumberFromOCR = (ocrText) => {
-  const cleanedText = ocrText
-    .replace(/[Il]/g, '1')
-    .replace(/[oO]/g, '0');
-
-  // Helper to correct first digit if it's 4 or 5
-  const correctFirstDigit = (num) => {
-    if (/^[456789]/.test(num)) {
-      return '1' + num.slice(1);
-    }
-    return num;
-  };
-
-  // First priority: Check for format with slash (flexible spacing)
-  const setMatch = cleanedText.match(/\b(\d{2,3})\s*[\/\\]\s*(\d{2,3})\b/);
-  if (setMatch) {
-    const [_, num1, num2] = setMatch;
-    const correctedNum1 = correctFirstDigit(num1);
-    const correctedNum2 = correctFirstDigit(num2);
-    return `${correctedNum1.padStart(3, '0')}/${correctedNum2.padStart(3, '0')}`;
+  } catch (error) {
+    console.error("Error uploading and scanning file:", error);
+    alert("Failed to scan file.");
+  } finally {
+    setScanLoading(false);
   }
-
-  // Second priority: Look for embedded numbers
-  const longNumberMatch = cleanedText.match(/\b(\d{6,7})\b/);
-  if (longNumberMatch) {
-    const num = longNumberMatch[1];
-    if (num.length >= 6) {
-      const first = correctFirstDigit(num.substring(0, 3));
-      const second = correctFirstDigit(num.substring(3, 6));
-      return `${first}/${second}`;
-    }
-  }
-
-  // Third priority: Check for promo numbers
-  const promoMatch = cleanedText.match(/\b(0\d{2})\b/);
-  if (promoMatch) {
-    return promoMatch[1];
-  }
-
-  // Last priority: Check for set codes
-  if (cleanedText.includes('SM') || cleanedText.includes('SV')) {
-    const codeMatch = cleanedText.match(/\b(\d{2,3})\b/);
-    if (codeMatch) {
-      const num = correctFirstDigit(codeMatch[1]);
-      return num.padStart(3, '0');
-    }
-  }
-
-  return "Not Detected";
 };
 
-const handleFileChange = (e) => {
-  // Clear any existing webcam captures
-  setFile(null); 
-  setFile(e.target.files[0]);
-  setFileUploaded(true);
-  setScanCompleted(false);
-  setOcrResult("");
-  setCardName("");
-  setCardSetNumber("");
-  setEbayResults([]);
-  setEbaySearchCompleted(false);
-};
-
-  const handleScan = async () => {
-    if (!file) {
-      alert("Please select a file first.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    setScanLoading(true);
-    try {
-      const response = await axios.post("http://127.0.0.1:5001/ocr", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      let resultText = response.data.text.join(", ");
-      resultText = correctMisreads(resultText);
-      setOcrResult(resultText);
-
-      const name = extractCardNameFromOCR(resultText);
-      const setNumber = extractSetNumberFromOCR(resultText);
-
-      setCardName(name);
-      setCardSetNumber(setNumber);
-      setScanCompleted(true);
-    } catch (error) {
-      console.error("Error uploading and scanning file:", error);
-      alert("Failed to scan file.");
-    } finally {
-      setScanLoading(false);
-    }
-  };
-
-  const handleEbaySearch = async () => {
-    if (!cardName || !cardSetNumber) {
-      alert("Please scan a card to get the card name and set number first.");
-      return;
-    }
-
+  const handleManualSearch = async () => {
     setEbayLoading(true);
     try {
       const response = await axios.post("http://localhost:5001/api/ebay-search", {
-        cardName,
-        cardSetNumber,
+        cardName: cardName.trim(),
+        cardSetNumber: manualSetNumber.trim(),
+        searchType: 'exact'
       });
 
       setEbayResults(response.data);
       setEbaySearchCompleted(true);
     } catch (error) {
-      console.error("Error fetching eBay results:", error);
-      alert("Failed to fetch eBay results.");
+      console.error("Error searching eBay:", error?.response?.data || error);
     } finally {
       setEbayLoading(false);
     }
@@ -226,127 +282,100 @@ const handleFileChange = (e) => {
               type="file"
               className="file-input-hidden"
               onChange={handleFileChange}
+              accept="image/*"
             />
           </label>
         </div>
 
-        <div style={{ marginTop: "20px" }}>
-          <h3>Or, use your webcam to take a picture of your card.</h3>
-          <WebcamComponent 
-            onCapture={(capturedFile) => {
-              setFile(capturedFile);
-              setFileUploaded(true);
-              setScanCompleted(false);
-              setOcrResult("");
-              setCardName("");
-              setCardSetNumber("");
-              setEbayResults([]);
-              setEbaySearchCompleted(false);
-            }} 
-          />
-        </div>
-
-        {file && (
-          <div style={{ marginTop: "10px" }}>
-            <img
-              src={URL.createObjectURL(file)}
-              alt="Preview"
-              style={{ width: "200px", border: "1px solid #ccc" }}
+        {imagePreview && (
+          <div className="image-preview-container">
+            <img 
+              src={imagePreview} 
+              alt="Preview" 
+              className="image-preview"
             />
           </div>
         )}
 
-        <button
-          onClick={handleScan}
-          className={`button ${scanLoading ? "loading" : ""}`}
-          disabled={!file || scanLoading}
-        >
-          {scanLoading ? "Scanning..." : "Scan"}
-        </button>
-
-        {scanLoading && (
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <img
-              src={pikachuRun}
-              alt="Loading..."
-              style={{ width: "120px", height: "auto" }}
-            />
+        {fileUploaded && (
+          <div className="scan-button-container">
+            <button 
+              onClick={handleScan}
+              disabled={scanLoading}
+              className="scan-button"
+            >
+              {scanLoading ? (
+                <>
+                  <img src={pikachuRun} alt="Loading..." className="loading-gif" />
+                  Scanning...
+                </>
+              ) : (
+                "Scan Card"
+              )}
+            </button>
           </div>
         )}
 
         {scanCompleted && (
           <>
-            <p>
-              <strong>Card Name:</strong> {cardName}
-            </p>
-            <p>
-              <strong>Card Set Number:</strong> {cardSetNumber}
-            </p>
+            <p><strong>Card Name:</strong> {cardName}</p>
+            <p><strong>Card Set Number:</strong> {cardSetNumber}</p>
+            <button 
+              disabled={ebayLoading}
+              className="search-button"
+            >
+              Search eBay
+            </button>
           </>
         )}
-      </section>
 
-      <hr />
+        <section className="ebay-results-section">
+          {ebayLoading ? (
+            <p>Searching eBay...</p>
+          ) : (
+            <>
+              <ul className="ebay-results-list">
+                {ebayResults.map((item, index) => (
+                  <li key={index}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{item.title}</span>
+                        <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
 
-      <section>
-        <h2>eBay Results</h2>
-        <button
-          onClick={handleEbaySearch}
-          className={`button ${ebayLoading ? "loading" : ""}`}
-          disabled={!cardName || !cardSetNumber || ebayLoading}
-        >
-          {ebayLoading ? "Searching eBay..." : "Search eBay"}
-        </button>
-
-        {ebayLoading && (
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <img
-              src={pikachuRun}
-              alt="Loading..."
-              style={{ width: "120px", height: "auto" }}
-            />
-          </div>
-        )}
-
-        <div className="ebay-results">
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {ebayResults.length > 0 ? (
-              ebayResults.map((item, index) => (
-                <li key={index} style={{ margin: '10px 0' }}>
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: '#0066c0',
-                      textDecoration: 'none',
-                      display: 'block',
-                      padding: '10px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      backgroundColor: '#ffffff',
-                      transition: 'background-color 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#ffffff';
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{item.title}</span>
-                      <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
+              {ebaySearchCompleted && ebayResults.length === 0 && (
+                <>
+                  <p>No eBay results found.</p>
+                  {showManualInput && (
+                    <div className="manual-input-container">
+                      <p>Try entering the set number manually:</p>
+                      <div className="manual-input-wrapper">
+                        <input
+                          type="text"
+                          value={manualSetNumber}
+                          onChange={(e) => setManualSetNumber(e.target.value)}
+                          placeholder="Enter set number (e.g. 061/064)"
+                          className="manual-input"
+                        />
+                        <button 
+                          onClick={handleManualSearch}
+                          disabled={!manualSetNumber.trim() || ebayLoading}
+                          className="manual-search-button"
+                        >
+                          Search Again
+                        </button>
+                      </div>
                     </div>
-                  </a>
-                </li>
-              ))
-            ) : (
-              ebaySearchCompleted && <p>No eBay results found.</p>
-            )}
-          </ul>
-        </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </section>
       </section>
     </div>
   );
