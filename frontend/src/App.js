@@ -542,6 +542,7 @@ const handleNoResults = () => {
       </div>
     )}
 
+      {(ebaySearchCompleted || ebayLoading) && (
         <section className="ebay-results-section">
           {ebayLoading ? (
             <p>Searching eBay...</p>
@@ -588,10 +589,11 @@ const handleNoResults = () => {
             </>
           )}
         </section>
+      )}
 
         {(showManualInput || ebayError) && ebayResults.length === 0 && (
           <div className="manual-search-wrapper">
-            <h3>No results found. Try adjusting the card details:</h3>
+            <h3>No eBay results found. Try adjusting the card details:</h3>
             <ManualSearch
               initialCardName={cardName}
               initialSetNumber={cardSetNumber}
