@@ -1,0 +1,32 @@
+.manual-search {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+  }
+  
+  .manual-search input {
+    margin: 5px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: calc(100% - 26px);
+  }
+  
+  .manual-search button {
+    margin: 5px;
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+  }
+  
+  .error {
+    color: red;
+    margin-top: 5px;
+    font-size: 0.9em;
+  }
