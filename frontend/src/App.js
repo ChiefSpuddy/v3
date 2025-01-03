@@ -8,6 +8,7 @@ import WebcamComponent from './Components/WebcamComponent';
 import Navbar from './Components/Navbar';
 import pikachuRun from './Assets/pikachu-run.gif';
 import ManualSearch from './Components/ManualSearch';
+import cardSetNames from './Assets/CardSetNames.json';
 
 // Constants
 const specialPrefixes = ['Radiant', 'Ancient', 'Origin'];
@@ -478,41 +479,67 @@ const handleNoResults = () => {
 const extractCardInfoFromListings = (listings) => {
   if (!listings || listings.length === 0) return null;
 
-  // Analyze all titles to find common patterns
+  // Function to find matching set name from our known sets
+  const findSetName = (title) => {
+    return cardSetNames.find(setName => 
+      title.toLowerCase().includes(setName.toLowerCase())
+    );
+  };
+
+  // Function to extract card number from title or original scan
+  const findCardNumber = (title, originalNumber) => {
+    // Try to find XXX/XXX pattern in title
+    const numberMatch = title.match(/(\d{1,3})[/\\](\d{1,3})/);
+    if (numberMatch) return `${numberMatch[1]}/${numberMatch[2]}`;
+    
+    // If no match in title, use original number if valid
+    if (originalNumber && originalNumber !== "Not Detected") {
+      return originalNumber;
+    }
+    
+    return "Unknown";
+  };
+
   const setInfo = listings.reduce((info, listing) => {
     const title = listing.title.toLowerCase();
     const price = parseFloat(listing.price.replace(/[^0-9.]/g, ''));
-
-    // Try to extract set name (usually in parentheses or after "Pokemon")
-    const setMatch = title.match(/\b(?:pokemon\s+)?(.*?)\s+(?:set|tcg|trading card game)/i) ||
-                    title.match(/\((.*?)\)/);
-    if (setMatch && setMatch[1]) {
-      info.setNames.add(setMatch[1].trim());
+    
+    // Try to find set name in this listing
+    const setName = findSetName(title);
+    if (setName) {
+      info.setNames.add(setName);
     }
 
-    // Add price for calculations
+    // Try to find card number in this listing
+    const cardNum = findCardNumber(title, cardSetNumber);
+    if (cardNum !== "Unknown") {
+      info.cardNumbers.add(cardNum);
+    }
+
     info.prices.push(price);
-
     return info;
-  }, { setNames: new Set(), prices: [] });
+  }, { 
+    setNames: new Set(), 
+    cardNumbers: new Set(), 
+    prices: [] 
+  });
 
-  // Calculate statistics
-  const prices = setInfo.prices;
-  const avgPrice = (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2);
-  const minPrice = Math.min(...prices).toFixed(2);
-  const maxPrice = Math.max(...prices).toFixed(2);
-
-  // Get most common set name
+  // Get most common set name, or use first one found
   const setName = Array.from(setInfo.setNames)[0] || 'Unknown Set';
+  
+  // Get card number (prefer scanned number if available)
+  const finalCardNumber = cardSetNumber !== "Not Detected" 
+    ? cardSetNumber 
+    : Array.from(setInfo.cardNumbers)[0] || "Unknown";
 
+  const prices = setInfo.prices.filter(price => price > 0);
   return {
-    setName: setName.charAt(0).toUpperCase() + setName.slice(1),
-    cardNumber: cardSetNumber || 'Unknown',
-    releaseYear: new Date().getFullYear(), // Default to current year if not found
-    averagePrice: avgPrice,
-    lowestPrice: minPrice,
-    highestPrice: maxPrice,
-    listingCount: listings.length
+    setName: setName,
+    cardNumber: finalCardNumber,
+    listingCount: listings.length,
+    averagePrice: (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2),
+    lowestPrice: Math.min(...prices).toFixed(2),
+    highestPrice: Math.max(...prices).toFixed(2)
   };
 };
 
