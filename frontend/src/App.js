@@ -1,18 +1,18 @@
-import "./App.css";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './App.css';
 import Home from './pages/Home';
 import pokemonNames from './Assets/PokemonNames.json';
-import React, { useState } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import axios from "axios";
 import WebcamComponent from './Components/WebcamComponent';
 import Navbar from './Components/Navbar';
 import pikachuRun from './Assets/pikachu-run.gif';
+import ManualSearch from './Components/ManualSearch';
 
 // Constants
 const specialPrefixes = ['Radiant', 'Ancient', 'Origin'];
 const specialTypes = ['V', 'VSTAR', 'VMAX', 'GX', 'EX'];
 const knownPokemon = pokemonNames?.names || [];
-
 const exclusions = [
   "hp", "basic", "stage", "item", "use", "this", "card",
   "your", "from", "energy", "damage", "more", "each",
@@ -24,7 +24,7 @@ const exclusions = [
   "aura star", "power", "poweril", "vstar power",
 ];
 
-// Helper Functions
+// Helper Functions - Move these outside of any component
 const cleanText = (text) => {
   return text
     .replace(/[Il]/g, 'l')
@@ -241,7 +241,9 @@ const extractSetNumberFromOCR = (ocrText) => {
   return "Not Detected";
 };
 
+// Scanner Component
 function Scanner() {
+  // Combine all state declarations
   const [file, setFile] = useState(null);
   const [ocrResult, setOcrResult] = useState("");
   const [cardName, setCardName] = useState("");
@@ -255,6 +257,10 @@ function Scanner() {
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualSetNumber, setManualSetNumber] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
+  const [manualCardName, setManualCardName] = useState('');
+  const [showManualSearch, setShowManualSearch] = useState(false);
+  const [ebayError, setEbayError] = useState(null);
+  const [cardDetails, setCardDetails] = useState(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -350,7 +356,7 @@ const handleScan = async () => {
           
           if (ebayResponse.data.length === 0) {
             console.log("No eBay listings found for:", searchParams);
-            setShowManualInput(true);
+            handleNoResults();
           }
         } else if (ebayResponse.data?.error) {
           console.error("eBay API Error:", ebayResponse.data.error);
@@ -381,22 +387,67 @@ const handleScan = async () => {
   }
 };
 
-const handleManualSearch = async () => {
-  setEbayLoading(true);
+const searchEbay = async (params) => {
   try {
-    const response = await axios.post("http://localhost:5001/api/ebay-search", {
-      cardName: cardName.trim(),
-      cardSetNumber: manualSetNumber.trim(),
-      searchType: 'exact'
-    });
-
-    setEbayResults(response.data);
-    setEbaySearchCompleted(true);
+    const response = await axios.post(
+      "http://localhost:5001/api/ebay-search",
+      params,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 10000
+      }
+    );
+    return response.data;
   } catch (error) {
-    console.error("Error searching eBay:", error?.response?.data || error);
+    console.error("eBay search request failed:", error);
+    throw new Error(error.response?.data?.error || 'Failed to search eBay');
+  }
+};
+
+const handleManualSearch = async (searchData) => {
+  setEbayLoading(true);
+  setEbayError(null);
+  try {
+    const searchParams = {
+      cardName: searchData.name,
+      cardSetNumber: searchData.setNumber,
+      searchType: 'exact'
+    };
+    
+    const results = await searchEbay(searchParams);
+    
+    if (Array.isArray(results)) {
+      setEbayResults(results);
+      setEbaySearchCompleted(true);
+      
+      if (results.length > 0) {
+        // Hide manual search when we have results
+        setShowManualInput(false);
+        setShowManualSearch(false);
+        setEbayError(null);
+      } else {
+        setEbayError('No listings found for this card');
+      }
+    } else {
+      throw new Error('Invalid response format');
+    }
+  } catch (error) {
+    console.error("Manual search failed:", error);
+    setEbayError(error.message || 'Failed to search eBay');
+    setEbayResults([]);
   } finally {
     setEbayLoading(false);
   }
+};
+
+const handleNoResults = () => {
+  setShowManualInput(true);
+  // Pre-populate with scanned data
+  setManualCardName(cardName);
+  setManualSetNumber(cardSetNumber);
 };
 
   return (
@@ -453,6 +504,44 @@ const handleManualSearch = async () => {
           </>
         )}
 
+{ebayError && (
+      <div className="error-container">
+        <p className="error-message">{ebayError}</p>
+        <button 
+          onClick={() => setShowManualSearch(true)}
+          className="manual-search-trigger"
+        >
+          Try Manual Search
+        </button>
+        
+        {showManualSearch && (
+          <div className="manual-search-container">
+            <input
+              type="text"
+              placeholder="Enter card name"
+              value={manualCardName}
+              onChange={(e) => setManualCardName(e.target.value)}
+              className="manual-input"
+            />
+            <input
+              type="text"
+              placeholder="Enter set number"
+              value={manualSetNumber}
+              onChange={(e) => setManualSetNumber(e.target.value)}
+              className="manual-input"
+            />
+            <button
+              onClick={handleManualSearch}
+              disabled={!manualCardName.trim() && !manualSetNumber.trim()}
+              className="manual-search-button"
+            >
+              Search Again
+            </button>
+          </div>
+        )}
+      </div>
+    )}
+
         <section className="ebay-results-section">
           {ebayLoading ? (
             <p>Searching eBay...</p>
@@ -499,10 +588,25 @@ const handleManualSearch = async () => {
             </>
           )}
         </section>
+
+        {(showManualInput || ebayError) && ebayResults.length === 0 && (
+          <div className="manual-search-wrapper">
+            <h3>No results found. Try adjusting the card details:</h3>
+            <ManualSearch
+              initialCardName={cardName}
+              initialSetNumber={cardSetNumber}
+              onSearch={handleManualSearch}
+              className="manual-search-below-preview"
+              error={ebayError}
+            />
+          </div>
+        )}
       </section>
     </div>
   );
 }
+
+// Remove App component since its functionality is merged into Scanner
 
 function AppWrapper() {
   return (
@@ -516,4 +620,5 @@ function AppWrapper() {
   );
 }
 
+// Export at top level
 export default AppWrapper;
