@@ -1,5 +1,6 @@
 import "./App.css";
 import Home from './pages/Home';
+import pokemonNames from './Assets/PokemonNames.json';
 import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import axios from "axios";
@@ -8,12 +9,10 @@ import Navbar from './Components/Navbar';
 import pikachuRun from './Assets/pikachu-run.gif';
 
 // Constants
-const specialTypes = ["EX", "GX", "V STAR", "VSTAR", "V", "VMAX"];
-const specialPrefixes = ["Radiant"];
-const knownPokemon = [
-  "Mew", "Lucario", "Pikachu", "Charizard", "Mewtwo", 
-  "Magneton", "Ceruledge"
-];
+const specialPrefixes = ['Radiant', 'Ancient', 'Origin'];
+const specialTypes = ['V', 'VSTAR', 'VMAX', 'GX', 'EX'];
+const knownPokemon = pokemonNames?.names || [];
+
 const exclusions = [
   "hp", "basic", "stage", "item", "use", "this", "card",
   "your", "from", "energy", "damage", "more", "each",
@@ -26,12 +25,14 @@ const exclusions = [
 // Helper Functions
 const cleanText = (text) => {
   return text
-    .replace(/VSTAR/i, "V STAR")
-    .replace(/[@\[\]{}\\\/\(\)]/g, ' ')
-    .replace(/\d+/g, ' ')
-    .replace(/[^a-zA-Z\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/[Il]/g, 'l')
+    .replace(/[oO]/g, 'o')
+    .replace(/\bSTAGG\b/gi, "Stage")
+    .replace(/['']/g, "'")
+    .replace(/\bvessel\b/gi, "Vessel")
+    .replace(/\bSZAR\b/gi, "VSTAR")  // Fix common VSTAR misread
+    .replace(/(\w+)ex\s+EX/gi, "$1 EX")
+    .replace(/(\w+)ex(?!\s+EX)/gi, "$1 EX");
 };
 
 const correctMisreads = (text) => {
@@ -43,60 +44,119 @@ const correctMisreads = (text) => {
     .replace(/\bvessel\b/gi, "Vessel");
 };
 
+const findClosestPokemon = (text) => {
+  if (!Array.isArray(knownPokemon) || knownPokemon.length === 0) {
+    console.error('Pokemon names not loaded correctly');
+    return null;
+  }
+
+  const cleanedText = text.toLowerCase()
+    .replace(/[Il]/g, 'l')
+    .replace(/[oO]/g, 'o')
+    .replace(/evolves\s+from\s+/gi, '')
+    .replace(/ability|abliity/gi, '')
+    .replace(/€X/gi, " EX")
+    .replace(/szar/gi, "vstar");
+
+  // Check for Pokemon with EX suffix first
+  const exMatch = cleanedText.match(/(\w+)(?:[€e]x)?\s*(?:ex|€x)\b/i);
+  if (exMatch) {
+    const baseName = exMatch[1];
+    const pokemonMatch = knownPokemon.find(pokemon => 
+      pokemon.toLowerCase() === baseName.toLowerCase());
+    if (pokemonMatch) return `${pokemonMatch} EX`;
+  }
+
+  // Regular Pokemon name checks with all suffixes
+  const exactMatch = knownPokemon.find(pokemon => 
+    pokemon && cleanedText.includes(pokemon.toLowerCase()));
+  if (exactMatch) {
+    const hasVSTAR = /vstar|szar/i.test(cleanedText);
+    const hasVMAX = /vmax/i.test(cleanedText);
+    const hasEX = /\bex\b/i.test(cleanedText);
+    const hasV = cleanedText.includes(' v');
+
+    if (hasVSTAR) return `${exactMatch} VSTAR`;
+    if (hasVMAX) return `${exactMatch} VMAX`;
+    if (hasEX) return `${exactMatch} EX`;
+    if (hasV) return `${exactMatch} V`;
+    return exactMatch;
+  }
+
+  return null;
+};
+
 const extractCardNameFromOCR = (ocrText) => {
   const segments = ocrText.split(/[,.-]/);
+  const skipPatterns = /evolves?\s+from|hp|damage|attack/i;
+
+  console.log("Processing segments:", segments);
 
   for (const segment of segments) {
     const cleaned = cleanText(segment);
+    if (skipPatterns.test(cleaned)) continue;
 
-    // Check for Radiant prefix
+    // Enhanced Trainer card detection
+    if (/trainer|item|supporter/i.test(cleaned)) {
+      const fullText = segments.join(", ");
+      console.log("Trainer card detected, full text:", fullText);
+      
+      // Look for card name after TRAINER keyword
+      const nameMatch = fullText.match(/(?:trainer|item|supporter)[,\s]+([^,\n]+)/i);
+      if (nameMatch && nameMatch[1]) {
+        const cardName = nameMatch[1].trim()
+          .split(/[,\n]/)[0]  // Take first segment
+          .replace(/^\s*,\s*/, '')  // Remove leading comma
+          .replace(/\d+/g, '')  // Remove numbers
+          .trim();
+        
+        console.log("Extracted trainer name:", cardName);
+        if (cardName && cardName.length > 3) {  // Basic validation
+          return cardName;
+        }
+      }
+    }
+
+    // Check for special prefixes + Pokemon
     for (const prefix of specialPrefixes) {
-      const radiantMatch = new RegExp(`${prefix}\\s+([A-Z][a-z]+)`, 'i');
-      const match = cleaned.match(radiantMatch);
-      if (match) return `${prefix} ${match[1]}`;
-    }
-    
-    // Check for known Pokémon with special types
-    for (const pokemon of knownPokemon) {
-      for (const type of specialTypes) {
-        const pattern = new RegExp(`${pokemon}.*?${type}|${type}.*?${pokemon}`, 'i');
-        if (pattern.test(cleaned)) {
-          return `${pokemon} ${type}`;
-        }
-      }
-      // Check for just the Pokémon name
-      if (cleaned.toLowerCase().includes(pokemon.toLowerCase())) {
-        return pokemon;
+      const pokemonName = findClosestPokemon(cleaned);
+      if (pokemonName && cleaned.toLowerCase().includes(prefix.toLowerCase())) {
+        return `${prefix} ${pokemonName}`;
       }
     }
 
-    const words = cleaned.split(' ')
-      .filter(word => 
-        word.length >= 4 &&
-        !exclusions.includes(word.toLowerCase()) &&
-        /^[A-Z][a-z]{2,}$/.test(word)
-      );
-
-    if (words.length > 0) {
-      // Try multi-word names
-      if (words.length >= 2) {
-        const twoWords = words.slice(0, 2).join(' ');
-        for (const type of specialTypes) {
-          if (new RegExp(`${twoWords}\\s*${type}`, 'i').test(cleaned)) {
-            return `${twoWords} ${type}`;
-          }
-        }
-        return twoWords;
-      }
-
-      // Single word with special type
+    // Check for Pokemon + Type combinations
+    const pokemonName = findClosestPokemon(cleaned);
+    if (pokemonName) {
       for (const type of specialTypes) {
-        if (new RegExp(`${words[0]}\\s*${type}`, 'i').test(cleaned)) {
-          return `${words[0]} ${type}`;
+        if (cleaned.toLowerCase().includes(type.toLowerCase())) {
+          return `${pokemonName} ${type}`;
         }
       }
+      return pokemonName;
+    }
 
-      return words[0];
+
+    // Third: Look for compound names
+    const twoWordMatch = cleaned.match(/\b([A-Z][a-z]+)\s+([A-Z][a-z]+|[A-Z]+)\b/);
+    if (twoWordMatch) {
+      const [_, first, second] = twoWordMatch;
+      if (!exclusions.includes(first.toLowerCase()) && 
+          !exclusions.includes(second.toLowerCase()) &&
+          !skipPatterns.test(`${first} ${second}`)) {
+        return `${first} ${second}`;
+      }
+    }
+
+    // Fourth: Look for single names with types
+    const singleWordMatch = cleaned.match(/\b([A-Z][a-z]+)\b/);
+    if (singleWordMatch && !exclusions.includes(singleWordMatch[1].toLowerCase())) {
+      for (const type of specialTypes) {
+        if (cleaned.toLowerCase().includes(type.toLowerCase())) {
+          return `${singleWordMatch[1]} ${type}`;
+        }
+      }
+      return singleWordMatch[1];
     }
   }
 
@@ -104,18 +164,31 @@ const extractCardNameFromOCR = (ocrText) => {
 };
 
 const extractSetNumberFromOCR = (ocrText) => {
-  console.log("Raw OCR Text:", ocrText);
-
   const cleanedText = ocrText
     .replace(/[Il]/g, '1')
     .replace(/[oO]/g, '0')
     .replace(/[.,;]/g, ' ');
 
+  const correctSetNumber = (num) => {
+    // Correct first digit if it's 4-9
+    if (/^[456789]\d{2}/.test(num)) {
+      return '1' + num.slice(1);
+    }
+    // Also correct second number in XXX/XXX format
+    if (/^\d{3}\/[456789]\d{2}$/.test(num)) {
+      const [first, second] = num.split('/');
+      return `${first}/1${second.slice(1)}`;
+    }
+    return num;
+  };
+
   // First: Look for XXX/XXX format - highest priority and keep both numbers
   const setMatch = cleanedText.match(/\b(\d{2,3})\s*[\/\\]\s*(\d{2,3})\b/);
   if (setMatch) {
     const [_, num1, num2] = setMatch;
-    return `${num1.padStart(3, '0')}/${num2.padStart(3, '0')}`;
+    const correctedNum1 = correctSetNumber(num1);
+    const correctedNum2 = num2.replace(/^[456789]/, '1');  // Correct second number
+    return `${correctedNum1.padStart(3, '0')}/${correctedNum2.padStart(3, '0')}`;
   }
 
   // Second: Look for 6-7 digit numbers to split
@@ -123,25 +196,31 @@ const extractSetNumberFromOCR = (ocrText) => {
   if (longNumberMatch) {
     const num = longNumberMatch[1];
     if (num.length >= 6) {
-      const first = num.substring(0, 3);
+      const first = correctSetNumber(num.substring(0, 3));
       const second = num.substring(3, 6);
       return `${first}/${second}`;
     }
   }
 
-  // Third: Check for SWSH/SM numbers
+  // Third: Check for standalone 3-digit numbers
+  const threeDigitMatch = cleanedText.match(/\b([5]\d{2})\b/);
+  if (threeDigitMatch) {
+    return correctSetNumber(threeDigitMatch[1]);
+  }
+
+  // Fourth: Check for SWSH/SM numbers
   const swshMatch = cleanedText.match(/\b(?:SWSH|SM)\s*(\d{2,3})\b/i);
   if (swshMatch) {
     return swshMatch[1].padStart(3, '0');
   }
 
-  // Fourth: Look for exact promo numbers (075)
+  // Fifth: Look for exact promo numbers (075)
   const promoMatch = cleanedText.match(/\b0\s*7\s*5\b/);
   if (promoMatch) {
     return promoMatch[0].replace(/\s/g, '');
   }
 
-  // Fifth: Look for standalone "050" style numbers
+  // Sixth: Look for standalone "050" style numbers
   const standaloneMatch = cleanedText.match(/\b0\s*[45]\s*[0-9]\b/);
   if (standaloneMatch) {
     return standaloneMatch[0].replace(/\s/g, '');
@@ -204,70 +283,109 @@ const handleScan = async () => {
   formData.append("file", file);
 
   setScanLoading(true);
+  setEbayResults([]);
+  setEbaySearchCompleted(false);
+  setShowManualInput(false);
+
   try {
+    // Step 1: OCR Scan
     const response = await axios.post("http://127.0.0.1:5001/ocr", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
     let resultText = response.data.text.join(", ");
-    resultText = correctMisreads(resultText);
+    resultText = cleanText(resultText)
+      .replace(/Snoriax/gi, "Snorlax")  // Add specific OCR corrections
+      .replace(/lax\b/gi, "lax");       // Fix common end patterns
+    
     setOcrResult(resultText);
 
     const name = extractCardNameFromOCR(resultText);
     const setNumber = extractSetNumberFromOCR(resultText);
-
+    
+    console.log("Extracted card details:", { name, setNumber, resultText });
+    
     setCardName(name);
     setCardSetNumber(setNumber);
     setScanCompleted(true);
 
-    // Auto trigger eBay search
+    // Step 2: eBay Search
     if (name !== "Not Detected") {
       setEbayLoading(true);
       try {
-        const ebayResponse = await axios.post("http://localhost:5001/api/ebay-search", {
+        const searchParams = {
           cardName: name.trim(),
-          cardSetNumber: setNumber !== "Not Detected" ? setNumber.trim() : null,
+          cardSetNumber: setNumber !== "Not Detected" ? setNumber.trim() : "",
           searchType: 'exact'
-        });
+        };
+        console.log("eBay search parameters:", searchParams);
 
-        setEbayResults(ebayResponse.data);
-        setEbaySearchCompleted(true);
-        
-        if (!ebayResponse.data || ebayResponse.data.length === 0) {
+        const ebayResponse = await axios.post(
+          "http://localhost:5001/api/ebay-search", 
+          searchParams,
+          { 
+            timeout: 10000,
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          }
+        );
+
+        if (ebayResponse.data && Array.isArray(ebayResponse.data)) {
+          setEbayResults(ebayResponse.data);
+          setEbaySearchCompleted(true);
+          
+          if (ebayResponse.data.length === 0) {
+            console.log("No eBay listings found for:", searchParams);
+            setShowManualInput(true);
+          }
+        } else if (ebayResponse.data?.error) {
+          console.error("eBay API Error:", ebayResponse.data.error);
+          setShowManualInput(true);
+          if (ebayResponse.data.error.includes('401')) {
+            console.error("Authorization failed - check API token");
+          }
+        } else {
+          console.error("Invalid response format:", ebayResponse.data);
           setShowManualInput(true);
         }
       } catch (error) {
-        console.error("Error searching eBay:", error?.response?.data || error);
+        console.error("eBay search failed:", {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
         setShowManualInput(true);
       } finally {
         setEbayLoading(false);
       }
     }
   } catch (error) {
-    console.error("Error uploading and scanning file:", error);
-    alert("Failed to scan file.");
+    console.error("OCR scan failed:", error);
+    alert("Failed to scan card image.");
   } finally {
     setScanLoading(false);
   }
 };
 
-  const handleManualSearch = async () => {
-    setEbayLoading(true);
-    try {
-      const response = await axios.post("http://localhost:5001/api/ebay-search", {
-        cardName: cardName.trim(),
-        cardSetNumber: manualSetNumber.trim(),
-        searchType: 'exact'
-      });
+const handleManualSearch = async () => {
+  setEbayLoading(true);
+  try {
+    const response = await axios.post("http://localhost:5001/api/ebay-search", {
+      cardName: cardName.trim(),
+      cardSetNumber: manualSetNumber.trim(),
+      searchType: 'exact'
+    });
 
-      setEbayResults(response.data);
-      setEbaySearchCompleted(true);
-    } catch (error) {
-      console.error("Error searching eBay:", error?.response?.data || error);
-    } finally {
-      setEbayLoading(false);
-    }
-  };
+    setEbayResults(response.data);
+    setEbaySearchCompleted(true);
+  } catch (error) {
+    console.error("Error searching eBay:", error?.response?.data || error);
+  } finally {
+    setEbayLoading(false);
+  }
+};
 
   return (
     <div className="app-container">
@@ -320,12 +438,6 @@ const handleScan = async () => {
           <>
             <p><strong>Card Name:</strong> {cardName}</p>
             <p><strong>Card Set Number:</strong> {cardSetNumber}</p>
-            <button 
-              disabled={ebayLoading}
-              className="search-button"
-            >
-              Search eBay
-            </button>
           </>
         )}
 
@@ -334,44 +446,43 @@ const handleScan = async () => {
             <p>Searching eBay...</p>
           ) : (
             <>
-              <ul className="ebay-results-list">
-                {ebayResults.map((item, index) => (
-                  <li key={index}>
-                    <a href={item.url} target="_blank" rel="noopener noreferrer">
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{item.title}</span>
-                        <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
-                      </div>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              {Array.isArray(ebayResults) && ebayResults.length > 0 ? (
+                <ul className="ebay-results-list">
+                  {ebayResults.map((item, index) => (
+                    <li key={index}>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{item.title}</span>
+                          <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>${item.price}</span>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                ebaySearchCompleted && <p>No eBay results found.</p>
+              )}
 
-              {ebaySearchCompleted && ebayResults.length === 0 && (
-                <>
-                  <p>No eBay results found.</p>
-                  {showManualInput && (
-                    <div className="manual-input-container">
-                      <p>Try entering the set number manually:</p>
-                      <div className="manual-input-wrapper">
-                        <input
-                          type="text"
-                          value={manualSetNumber}
-                          onChange={(e) => setManualSetNumber(e.target.value)}
-                          placeholder="Enter set number (e.g. 061/064)"
-                          className="manual-input"
-                        />
-                        <button 
-                          onClick={handleManualSearch}
-                          disabled={!manualSetNumber.trim() || ebayLoading}
-                          className="manual-search-button"
-                        >
-                          Search Again
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
+              {ebaySearchCompleted && ebayResults.length === 0 && showManualInput && (
+                <div className="manual-input-container">
+                  <p>Try entering the set number manually:</p>
+                  <div className="manual-input-wrapper">
+                    <input
+                      type="text"
+                      value={manualSetNumber}
+                      onChange={(e) => setManualSetNumber(e.target.value)}
+                      placeholder="Enter set number (e.g. 061/064)"
+                      className="manual-input"
+                    />
+                    <button 
+                      onClick={handleManualSearch}
+                      disabled={!manualSetNumber.trim() || ebayLoading}
+                      className="manual-search-button"
+                    >
+                      Search Again
+                    </button>
+                  </div>
+                </div>
               )}
             </>
           )}
