@@ -19,7 +19,9 @@ const exclusions = [
   "when", "than", "the", "put", "into", "discard", "pile",
   "attack", "effect", "during", "turn", "weakness", "resistance",
   "restart", "ability", "move", "power", "fighting", "knuckle",
-  "thunder", "flame", "water", "psychic", "strike", "pulse"
+  "thunder", "flame", "water", "psychic", "strike", "pulse",
+  "active pokemon", "active", "defending pokemon", "defending",
+  "aura star", "power", "poweril", "vstar power",
 ];
 
 // Helper Functions
@@ -30,9 +32,14 @@ const cleanText = (text) => {
     .replace(/\bSTAGG\b/gi, "Stage")
     .replace(/['']/g, "'")
     .replace(/\bvessel\b/gi, "Vessel")
-    .replace(/\bSZAR\b/gi, "VSTAR")  // Fix common VSTAR misread
-    .replace(/(\w+)ex\s+EX/gi, "$1 EX")
-    .replace(/(\w+)ex(?!\s+EX)/gi, "$1 EX");
+    .replace(/\bSZAR\b/gi, "VSTAR")
+    .replace(/\bLLucario\b/gi, "Lucario")
+    .replace(/\bUtem\b/gi, "Item")
+    .replace(/€X/gi, " EX")
+    .replace(/([a-zA-Z])eX\b/gi, "$1 EX")
+    .replace(/\bex\b/gi, " EX")
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
 const correctMisreads = (text) => {
@@ -58,23 +65,24 @@ const findClosestPokemon = (text) => {
     .replace(/€X/gi, " EX")
     .replace(/szar/gi, "vstar");
 
-  // Check for Pokemon with EX suffix first
-  const exMatch = cleanedText.match(/(\w+)(?:[€e]x)?\s*(?:ex|€x)\b/i);
-  if (exMatch) {
-    const baseName = exMatch[1];
+  // Check for EX with Euro symbol
+  if (cleanedText.includes('€x')) {
+    const baseName = cleanedText.split('€x')[0].trim();
     const pokemonMatch = knownPokemon.find(pokemon => 
-      pokemon.toLowerCase() === baseName.toLowerCase());
+      baseName.toLowerCase().includes(pokemon.toLowerCase()));
     if (pokemonMatch) return `${pokemonMatch} EX`;
   }
 
-  // Regular Pokemon name checks with all suffixes
+  // Regular Pokemon name checks with suffixes
   const exactMatch = knownPokemon.find(pokemon => 
-    pokemon && cleanedText.includes(pokemon.toLowerCase()));
+    pokemon && cleanedText.includes(pokemon.toLowerCase()) &&
+    !exclusions.includes(pokemon.toLowerCase()));
+
   if (exactMatch) {
     const hasVSTAR = /vstar|szar/i.test(cleanedText);
     const hasVMAX = /vmax/i.test(cleanedText);
     const hasEX = /\bex\b/i.test(cleanedText);
-    const hasV = cleanedText.includes(' v');
+    const hasV = /\bv\b/i.test(cleanedText);
 
     if (hasVSTAR) return `${exactMatch} VSTAR`;
     if (hasVMAX) return `${exactMatch} VMAX`;
@@ -85,6 +93,8 @@ const findClosestPokemon = (text) => {
 
   return null;
 };
+
+const trainerNameExclusions = ['utem', 'lten', 'ltem', 'iten'];
 
 const extractCardNameFromOCR = (ocrText) => {
   const segments = ocrText.split(/[,.-]/);
@@ -111,7 +121,9 @@ const extractCardNameFromOCR = (ocrText) => {
           .trim();
         
         console.log("Extracted trainer name:", cardName);
-        if (cardName && cardName.length > 3) {  // Basic validation
+        // Skip if name is in exclusions list
+        if (cardName && cardName.length > 3 && 
+            !trainerNameExclusions.includes(cardName.toLowerCase())) {
           return cardName;
         }
       }
